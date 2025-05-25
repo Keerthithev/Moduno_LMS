@@ -12,4 +12,8 @@ router.post('/reset-password/:token', authController.resetPassword);
 router.post('/logout',authController.logoutUser);
 router.post('/google-login', authController.googleLogin);
 router.get('/linkedin/callback', authController.linkedinAuth);
+
+router.get('/me', authController.getMe );
+router.put('/updatedetails',  authController.updateDetails);
+router.put('/updatepassword',  authController.updatePassword);
 module.exports = router;

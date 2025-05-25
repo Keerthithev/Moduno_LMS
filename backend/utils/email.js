@@ -14,7 +14,17 @@ const sendEmail = async (options) => {
       rejectUnauthorized: false // For self-signed certificates
     }
   });
+// Add validation before creating mailOptions
+if (!options?.email) {
+  console.error('No email provided in options:', options);
+  throw new Error('Recipient email is required');
+}
 
+// Verify your environment variables
+console.log({
+  EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME,
+  EMAIL_FROM_EMAIL: process.env.EMAIL_FROM_EMAIL
+});
   // 2. Define mail options
   const mailOptions = {
     from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_EMAIL}>`,

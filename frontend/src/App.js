@@ -11,6 +11,27 @@ import Logout from './components/Logout';
 import AdminAddCourseForm from './components/Admin/AdminAddCourseForm';
 import AdminCourseList from './components/Admin/AdminCourseList';
 import StudentCourseList from './components/Student/StudentCourseList';
+import { ErrorBoundary } from 'react-error-boundary';
+import Users from './components/Users'; // ✅ default import
+
+
+
+function ErrorFallback({ error, resetErrorBoundary }) {
+  return (
+    <div role="alert">
+      <p>Something went wrong:</p>
+      <pre>{error.message}</pre>
+      <button onClick={resetErrorBoundary}>Try again</button>
+    </div>
+  );
+}
+
+<ErrorBoundary
+  FallbackComponent={ErrorFallback}
+  onReset={() => window.location.reload()}
+>
+  <StudentCourseList />
+</ErrorBoundary>
 
 function App() {
   return (
@@ -31,6 +52,7 @@ function App() {
 
 } />
            <Route path="/courselist" element={<AdminCourseList />} />
+            <Route path="/users" element={<Users />} />
         </Routes>
       </div>
     </Router>

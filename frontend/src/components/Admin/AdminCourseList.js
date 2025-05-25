@@ -61,14 +61,19 @@ const AdminCourseList = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this course?")) return;
-    try {
-      await axios.delete(`http://localhost:1111/api/v1/courses/${id}`);
-      setCourses(courses.filter((c) => c._id !== id));
-    } catch (error) {
-      alert("Failed to delete course");
-    }
-  };
+  if (!window.confirm("Are you sure you want to delete this course?")) return;
+  try {
+    const token = localStorage.getItem("token");
+    await axios.delete(`http://localhost:1111/api/v1/courses/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setCourses(courses.filter((c) => c._id !== id));
+  } catch (error) {
+    alert("Failed to delete course");
+    console.error("Delete course error:", error);
+  }
+};
+
 
   const startEditing = (course) => {
     setEditingCourseId(course._id);
@@ -229,9 +234,13 @@ const AdminCourseList = () => {
         videos: editVideos,
       };
       const res = await axios.put(
-        `http://localhost:1111/api/v1/courses/${editingCourseId}`,
-        updatedCourse
-      );
+  `http://localhost:1111/api/v1/courses/${editingCourseId}`,
+  updatedCourse,
+  {
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  }
+);
+
       setCourses((prev) =>
         prev.map((course) =>
           course._id === editingCourseId ? res.data : course

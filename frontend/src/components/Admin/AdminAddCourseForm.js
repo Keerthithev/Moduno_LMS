@@ -22,20 +22,27 @@ const AdminAddCourseForm = ({ onCourseAdded }) => {
   const navigate = useNavigate();
 
   // Authentication & Role Check on mount
-  useEffect(() => {
-    const userJSON = localStorage.getItem("user");
-    if (!userJSON) {
-      alert("Please login first.");
-      navigate("/login");
-      return;
-    }
+ useEffect(() => {
+  const token = localStorage.getItem("token");
+  const userJSON = localStorage.getItem("user");
+
+  if (!token || !userJSON) {
+    alert("Please login first.");
+    navigate("/login");
+    return;
+  }
+
+  try {
     const user = JSON.parse(userJSON);
     if (user.role !== "admin") {
       alert("Access denied. Admins only.");
       navigate("/");
-      return;
     }
-  }, [navigate]);
+  } catch (error) {
+    console.error("Error parsing user data:", error);
+    navigate("/login");
+  }
+}, [navigate]);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -105,8 +112,10 @@ const AdminAddCourseForm = ({ onCourseAdded }) => {
 
     try {
       const userJSON = localStorage.getItem("user");
+      
       const user = userJSON ? JSON.parse(userJSON) : null;
-      const token = user?.token || "";
+      const token = localStorage.getItem("token");
+      console.log(token)
 
       const res = await axios.post(
         "http://localhost:1111/api/v1/upload/video",
@@ -175,51 +184,66 @@ const AdminAddCourseForm = ({ onCourseAdded }) => {
 
   // Submit course
   const handleSubmitCourse = async () => {
-    if (!canProceedToVideos) {
-      setErrorMessage("Please fill all course details.");
-      setStep(1);
-      return;
-    }
-    if (videos.length === 0) {
-      setErrorMessage("Please upload at least one video.");
-      setStep(2);
-      return;
-    }
-    setErrorMessage("");
+  if (!canProceedToVideos) {
+    setErrorMessage("Please fill all course details.");
+    setStep(1);
+    return;
+  }
+  if (videos.length === 0) {
+    setErrorMessage("Please upload at least one video.");
+    setStep(2);
+    return;
+  }
 
-    try {
-      const userJSON = localStorage.getItem("user");
-      const user = userJSON ? JSON.parse(userJSON) : null;
-      const token = user?.token || "";
+  setErrorMessage("");
+  setUploading(true);
 
-      const res = await axios.post(
-        "http://localhost:1111/api/v1/courses/create",
-        {
-          title: title.trim(),
-          description: description.trim(),
-          duration: Number(duration),
-          videos,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("No authentication token found");
+
+    const response = await axios.post(
+      "http://localhost:1111/api/v1/courses/create",
+      {
+        title: title.trim(),
+        description: description.trim(),
+        duration: Number(duration),
+        videos,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
         }
-      );
+      }
+    );
 
-      alert("Course created successfully!");
-      if (onCourseAdded) onCourseAdded(res.data);
-      setTitle("");
-      setDescription("");
-      setDuration("");
-      setVideos([]);
-      setStep(1);
-    } catch (error) {
-      console.error("Create course error:", error.response || error);
-      setErrorMessage(error.response?.data?.message || "Course creation failed.");
+    alert("Course created successfully!");
+    if (onCourseAdded) onCourseAdded(response.data);
+    resetForm();
+  } catch (error) {
+    console.error("Create course error:", error);
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      navigate("/login");
     }
-  };
+    setErrorMessage(
+      error.response?.data?.message || 
+      "Course creation failed. Please try again."
+    );
+  } finally {
+    setUploading(false);
+  }
+};
 
+const resetForm = () => {
+  setTitle("");
+  setDescription("");
+  setDuration("");
+  setVideos([]);
+  setStep(1);
+};
   const removeVideo = (index) => {
     setVideos((prev) => prev.filter((_, i) => i !== index));
   };

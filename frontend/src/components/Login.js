@@ -1,230 +1,86 @@
+"use client"
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, AlertCircle, Loader2, Box } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Loader2, Box, Zap, Sparkles, Play, Award, Users, Star, CheckCircle, ArrowRight, Monitor, Target, Globe, BookOpen, Clock, GraduationCap, MapPin } from 'lucide-react';
 import axios from 'axios';
 import { GoogleLogin } from '@react-oauth/google';
-import styled, { keyframes, css } from 'styled-components';
-
-// Animations
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
-
-const pulse = keyframes`
-  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-`;
-
-// Styled Components
-const Container = styled.div`
-  min-height: 100vh;
-  display: flex;
-  background: linear-gradient(135deg, #0B2545 0%, #172A57 50%, #1E3A8A 100%);
-  font-family: 'Inter', system-ui, sans-serif;
-  color: white;
-`;
-
-const LeftPanel = styled.div`
-  flex: 1;
-  display: none;
-  flex-direction: column;
-  justify-content: center;
-  padding: 0 2rem;
-  background: rgba(0, 0, 0, 0.2);
-  
-  @media (min-width: 1024px) {
-    display: flex;
-  }
-`;
-
-const RightPanel = styled.div`
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-`;
-
-const FormContainer = styled.div`
-  width: 100%;
-  max-width: 400px;
-  animation: ${fadeIn} 0.6s ease-out forwards;
-  opacity: 0;
-`;
-
-const LoginCard = styled.div`
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border-radius: 1rem;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 2rem;
-  color: white;
-`;
-
-const InputContainer = styled.div`
-  position: relative;
-  margin-bottom: 1.5rem;
-`;
-
-const InputIcon = styled.div`
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  left: 1rem;
-  color: #4ade80;
-`;
-
-const Input = styled.input`
-  width: 100%;
-  height: 3rem;
-  padding-left: 2.75rem;
-  padding-right: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0.5rem;
-  color: white;
-  outline: none;
-  transition: all 0.2s ease;
-  
-  &:focus {
-    border-color: #3B82F6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-  }
-`;
-
-const SubmitButton = styled.button`
-  width: 100%;
-  padding: 0.875rem 0;
-  border-radius: 0.5rem;
-  background: linear-gradient(135deg, #0B2545 0%, #172A57 100%);
-  color: white;
-  font-weight: 600;
-  border: none;
-  cursor: ${props => props.loading ? 'not-allowed' : 'pointer'};
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.2s ease;
-  opacity: ${props => props.loading ? 0.7 : 1};
-  
-  &:hover {
-    transform: ${props => props.loading ? 'none' : 'translateY(-2px)'};
-    box-shadow: ${props => props.loading ? 'none' : '0 4px 6px rgba(0, 0, 0, 0.1)'};
-  }
-  
-  &:active {
-    transform: ${props => props.loading ? 'none' : 'translateY(0)'};
-  }
-`;
-
-const ErrorMessage = styled.div`
-  display: flex;
-  align-items: center;
-  padding: 0.75rem;
-  background: rgba(220, 38, 38, 0.1);
-  border: 1px solid rgba(220, 38, 38, 0.3);
-  border-radius: 0.5rem;
-  color: #fca5a5;
-  margin-bottom: 1.5rem;
-`;
-
-const Divider = styled.div`
-  display: flex;
-  align-items: center;
-  margin: 1.5rem 0;
-  
-  &::before, &::after {
-    content: '';
-    height: 1px;
-    flex: 1;
-    background: rgba(255, 255, 255, 0.1);
-  }
-`;
-
-const DividerText = styled.span`
-  padding: 0 1rem;
-  color: #93C5FD;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-`;
-
-const SocialButtonsContainer = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
-`;
-
-const LinkedInButton = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  background-color: #0077B5;
-  border: none;
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
-  
-  &:hover {
-    background-color: #006097;
-    transform: translateY(-2px);
-  }
-  
-  &:active {
-    transform: translateY(0);
-  }
-`;
-
-const PulseBox = styled.div`
-  width: 3rem;
-  height: 3rem;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #0B2545 0%, #172A57 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 1rem;
-  animation: ${pulse} 2s infinite;
-`;
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [activePanel, setActivePanel] = useState('login');
+  const [isVisible, setIsVisible] = useState(false);
   const navigate = useNavigate();
-  const formRef = useRef(null);
+  const showcaseRef = useRef(null);
+  const loginRef = useRef(null);
 
-  const persistAuthData = (token, user) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-  };
+  // Workshop stats data
+  const workshopStats = [
+    { number: "40+", label: "Hours Training", icon: <Clock size={24} />, color: "#3B82F6" },
+    { number: "FREE", label: "3 Days Trial", icon: <Sparkles size={24} />, color: "#10B981" },
+    { number: "100%", label: "Practical", icon: <Monitor size={24} />, color: "#F59E0B" },
+    { number: "CERT", label: "Included", icon: <Award size={24} />, color: "#EC4899" }
+  ];
+
+  // Instructor features
+  const instructorFeatures = [
+    { text: "HND Qualified Civil Engineer", icon: <GraduationCap size={18} /> },
+    { text: "BCAS Jaffna Alumni", icon: <MapPin size={18} /> },
+    { text: "3D Visualization Specialist", icon: <Target size={18} /> },
+    { text: "Current BSc Student at ICBT", icon: <BookOpen size={18} /> }
+  ];
 
   useEffect(() => {
-    if (formRef.current) {
-      formRef.current.style.opacity = '0';
-      formRef.current.style.transform = 'translateY(20px)';
-      
-      setTimeout(() => {
-        formRef.current.style.transition = 'all 0.6s ease-out';
-        formRef.current.style.opacity = '1';
-        formRef.current.style.transform = 'translateY(0)';
-      }, 100);
-    }
-  }, []);
+    // Animation on mount
+    setTimeout(() => {
+      setIsVisible(true);
+    }, 100);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+    // Add floating particles to background
+    const particles = [];
+    for (let i = 0; i < 20; i++) {
+      const particle = document.createElement('div');
+      particle.style.position = 'fixed';
+      particle.style.width = `${Math.random() * 4 + 2}px`;
+      particle.style.height = `${Math.random() * 4 + 2}px`;
+      particle.style.background = `rgba(${Math.random() > 0.5 ? "59, 130, 246" : "16, 185, 129"}, 0.3)`;
+      particle.style.borderRadius = '50%';
+      particle.style.left = `${Math.random() * 100}%`;
+      particle.style.top = `${Math.random() * 100}%`;
+      particle.style.animation = `float ${Math.random() * 10 + 5}s ease-in-out infinite`;
+      particle.style.animationDelay = `${Math.random() * 5}s`;
+      particle.style.pointerEvents = 'none';
+      particle.style.zIndex = '0';
+      document.body.appendChild(particle);
+      particles.push(particle);
+    }
+
+    // Intersection observer for animations
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.style.opacity = 1;
+            entry.target.style.transform = 'translateY(0)';
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    if (showcaseRef.current) {
+      observer.observe(showcaseRef.current);
+    }
+    if (loginRef.current) {
+      observer.observe(loginRef.current);
+    }
+
+    return () => {
+      particles.forEach(p => p.remove());
+      observer.disconnect();
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -233,7 +89,8 @@ const Login = () => {
     
     try {
       const res = await axios.post('http://localhost:1111/api/v1/login', formData);
-      persistAuthData(res.data.token, res.data.user);
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
@@ -247,7 +104,8 @@ const Login = () => {
       const res = await axios.post('http://localhost:1111/api/v1/google-login', {
         token: credentialResponse.credential,
       });
-      persistAuthData(res.data.token, res.data.user);
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
       navigate('/dashboard');
     } catch (err) {
       setError('Google authentication failed. Please try another method.');
@@ -256,313 +114,558 @@ const Login = () => {
     }
   };
 
-  const handleGoogleLoginError = () => {
-    setError('Google authentication could not be completed.');
-    setLoading(false);
-    console.error('Google login failed');
-  };
-
-  const handleLinkedInLogin = () => {
-    const scope = 'r_liteprofile r_emailaddress';
-    const linkedInClientId = process.env.REACT_APP_LINKEDIN_CLIENT_ID || '86b3jq9v47dhtt';
-    const linkedInRedirectUri = process.env.REACT_APP_LINKEDIN_REDIRECT_URI || 
-      'http://localhost:2222/api/v1/auth/linkedin/callback';
-    
-    const linkedInAuthUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedInClientId}&redirect_uri=${encodeURIComponent(linkedInRedirectUri)}&scope=${encodeURIComponent(scope)}`;
-    window.location.href = linkedInAuthUrl;
-  };
-
   return (
-    <Container>
-      <LeftPanel>
-        <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
-            <PulseBox>
-              <Box size={24} color="white" />
-            </PulseBox>
-            <h1 style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              background: 'linear-gradient(to right, #3B82F6, #ffffff)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              margin: 0
-            }}>
-              MODUNO LMS
-            </h1>
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #0B2545 0%, #172A57 50%, #1E3A8A 100%)",
+      fontFamily: "Inter, system-ui, sans-serif",
+      color: "white",
+      display: "flex",
+      position: "relative",
+      overflow: "hidden"
+    }}>
+      {/* Animated Background Elements */}
+      <div style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        zIndex: 0,
+      }}></div>
+
+      {/* Left Panel - Workshop Showcase */}
+      <div ref={showcaseRef} style={{
+        flex: 1,
+        padding: "3rem",
+        display: "none",
+        flexDirection: "column",
+        justifyContent: "center",
+        opacity: 0,
+        transform: "translateX(-50px)",
+        transition: "all 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
+        '@media (min-width: 1024px)': {
+          display: "flex"
+        }
+      }}>
+        <div style={{ maxWidth: "600px", margin: "0 auto" }}>
+          {/* Workshop Header */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            marginBottom: "2rem",
+            background: "rgba(59, 130, 246, 0.15)",
+            border: "1px solid rgba(59, 130, 246, 0.3)",
+            borderRadius: "2rem",
+            padding: "0.75rem 1.5rem",
+            width: "fit-content",
+            animation: "glow 2s ease-in-out infinite alternate"
+          }}>
+            <Sparkles size={18} color="#3B82F6" />
+            <span style={{ fontSize: "0.875rem", color: "#93C5FD", fontWeight: "600" }}>
+              🎉 Inaugural Workshop Launch
+            </span>
           </div>
 
           <h2 style={{ 
-            fontSize: '2.5rem', 
-            fontWeight: '700',
-            lineHeight: '1.2',
-            marginBottom: '1.5rem'
+            fontSize: "2.5rem", 
+            fontWeight: "800",
+            lineHeight: "1.2",
+            marginBottom: "1.5rem",
+            background: "linear-gradient(135deg, #ffffff 0%, #93C5FD 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent"
           }}>
-            Welcome back to<br />Your 3D Learning Journey
+            Master SketchUp & Lumion
           </h2>
           
           <p style={{ 
-            fontSize: '1.125rem', 
-            color: '#93C5FD',
-            marginBottom: '2rem',
-            lineHeight: '1.6'
+            fontSize: "1.125rem", 
+            color: "#93C5FD",
+            marginBottom: "2.5rem",
+            lineHeight: "1.6"
           }}>
-            Access your premium SketchUp and Lumion courses with exclusive learning materials and mentorship.
+            Join our 40-hour intensive workshop and transform your 3D visualization skills with professional training.
           </p>
 
+          {/* Workshop Stats */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '1rem',
-            marginBottom: '2rem'
+            display: "grid",
+            gridTemplateColumns: "repeat(2, 1fr)",
+            gap: "1rem",
+            marginBottom: "2.5rem"
           }}>
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: '0.75rem',
-              padding: '1.5rem',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              transition: 'transform 0.2s ease'
-            }}>
-              <div style={{ 
-                fontSize: '1.5rem', 
-                fontWeight: '700', 
-                color: '#4ade80', 
-                marginBottom: '0.5rem'
-              }}>
-                SketchUp
-              </div>
-              <p style={{ fontSize: '0.875rem', color: '#93C5FD', margin: 0 }}>
-                Professional 3D Modeling
-              </p>
-            </div>
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: '0.75rem',
-              padding: '1.5rem',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              transition: 'transform 0.2s ease'
-            }}>
-              <div style={{ 
-                fontSize: '1.5rem', 
-                fontWeight: '700', 
-                color: '#4ade80', 
-                marginBottom: '0.5rem'
-              }}>
-                Lumion
-              </div>
-              <p style={{ fontSize: '0.875rem', color: '#93C5FD', margin: 0 }}>
-                Photorealistic Rendering
-              </p>
-            </div>
-          </div>
-
-          <blockquote style={{
-            borderLeft: '3px solid #4ade80',
-            paddingLeft: '1rem',
-            fontStyle: 'italic',
-            color: '#d1fae5'
-          }}>
-            "Moduno's 3D rendering courses helped me transform my design career and land major clients."
-            <footer style={{
-              marginTop: '0.5rem',
-              fontSize: '0.875rem',
-              color: '#a7f3d0'
-            }}>— Recent Graduate</footer>
-          </blockquote>
-        </div>
-      </LeftPanel>
-
-      <RightPanel>
-        <FormContainer ref={formRef}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            marginBottom: '2rem'
-          }} className="lg:hidden">
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <PulseBox style={{ width: '2.5rem', height: '2.5rem', marginRight: '0.75rem' }}>
-                <Box size={20} color="white" />
-              </PulseBox>
-              <h1 style={{
-                fontSize: '1.25rem',
-                fontWeight: '700',
-                background: 'linear-gradient(to right, #3B82F6, #ffffff)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                margin: 0
-              }}>
-                MODUNO LMS
-              </h1>
-            </div>
-          </div>
-
-          <LoginCard>
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                marginBottom: '0.5rem'
-              }}>
-                Sign in to your account
-              </h2>
-              <p style={{ color: '#93C5FD', fontSize: '0.875rem' }}>
-                Enter your credentials to access your dashboard
-              </p>
-            </div>
-
-            <SocialButtonsContainer>
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <div style={{ transform: 'scale(0.75)', transformOrigin: 'center' }}>
-                  <GoogleLogin
-                    onSuccess={handleGoogleLoginSuccess}
-                    onError={handleGoogleLoginError}
-                    theme="filled_blue"
-                    size="large"
-                  />
-                </div>
-              </div>
-              
-              <LinkedInButton onClick={handleLinkedInLogin}>
-                <svg width="20" height="20" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M34 20.333V34h-7.25v-12.5c0-3-1-5-3.5-5s-4 1.5-4 4.833V34H12.5V12.5h7v2.75h.1c1-1.8 3.3-3.5 6.8-3.5 7.25 0 8.6 4.7 8.6 10.583zM4.25 0a4.25 4.25 0 1 0 0 8.5A4.25 4.25 0 0 0 4.25 0zM0 34h8.5V12.5H0V34z" fill="white"/>
-                </svg>
-                LinkedIn
-              </LinkedInButton>
-            </SocialButtonsContainer>
-
-            <Divider>
-              <DividerText>Or continue with</DividerText>
-            </Divider>
-
-            {error && (
-              <ErrorMessage>
-                <AlertCircle size={16} style={{ marginRight: '0.5rem' }} />
-                <span style={{ fontSize: '0.875rem' }}>{error}</span>
-              </ErrorMessage>
-            )}
-
-            <form onSubmit={handleSubmit} style={{ marginBottom: '1.5rem' }}>
-              <InputContainer>
-                <label 
-                  htmlFor="email" 
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: '#93C5FD',
-                    marginBottom: '0.5rem'
-                  }}
-                >
-                  Email Address
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <InputIcon>
-                    <Mail size={18} />
-                  </InputIcon>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    required
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="you@example.com"
-                  />
-                </div>
-              </InputContainer>
-              
-              <InputContainer>
-                <label 
-                  htmlFor="password" 
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: '#93C5FD',
-                    marginBottom: '0.5rem'
-                  }}
-                >
-                  Password
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <InputIcon>
-                    <Lock size={18} />
-                  </InputIcon>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    required
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="••••••••"
-                  />
-                </div>
-              </InputContainer>
-
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1.5rem',
-                fontSize: '0.875rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input
-                    id="remember"
-                    type="checkbox"
-                    style={{
-                      width: '1rem',
-                      height: '1rem',
-                      accentColor: '#10b981',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                    }}
-                  />
-                  <label htmlFor="remember" style={{ color: '#d1fae5' }}>
-                    Remember me
-                  </label>
-                </div>
-
-                <Link to="/forgot-password" style={{
-                  color: '#93C5FD',
-                  textDecoration: 'none',
-                  fontWeight: '500',
-                  transition: 'color 0.2s ease'
+            {workshopStats.map((stat, index) => (
+              <div 
+                key={index}
+                style={{
+                  background: "rgba(255, 255, 255, 0.05)",
+                  borderRadius: "16px",
+                  padding: "1.5rem",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  transition: "all 0.3s ease",
+                  animation: `fadeInUp 0.8s ease-out ${index * 0.1}s both`
+                }}
+              >
+                <div style={{ 
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  marginBottom: "0.5rem"
                 }}>
-                  Forgot password?
-                </Link>
+                  <div style={{ color: stat.color }}>
+                    {stat.icon}
+                  </div>
+                  <div style={{ 
+                    fontSize: "1.5rem", 
+                    fontWeight: "700", 
+                    color: stat.color
+                  }}>
+                    {stat.number}
+                  </div>
+                </div>
+                <div style={{ 
+                  fontSize: "0.875rem", 
+                  color: "#93C5FD"
+                }}>
+                  {stat.label}
+                </div>
               </div>
+            ))}
+          </div>
 
-              <SubmitButton type="submit" disabled={loading} loading={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    Signing in...
-                  </>
-                ) : 'Sign In'}
-              </SubmitButton>
-            </form>
-
-            <p style={{ 
-              textAlign: 'center', 
-              color: '#93C5FD',
-              fontSize: '0.875rem', 
-              margin: 0 
+          {/* Instructor Section */}
+          <div style={{
+            background: "rgba(255, 255, 255, 0.08)",
+            borderRadius: "20px",
+            padding: "2rem",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+            marginBottom: "2rem"
+          }}>
+            <h3 style={{
+              fontSize: "1.5rem",
+              fontWeight: "700",
+              marginBottom: "1rem",
+              color: "white"
             }}>
-              Don't have an account?{' '}
-              <Link to="/register" style={{
-                color: '#93C5FD',
-                textDecoration: 'none',
-                fontWeight: '500',
-                transition: 'color 0.2s ease'
+              <span style={{ 
+                background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent"
               }}>
-                Create account
-              </Link>
+                Expert Instructor
+              </span>
+            </h3>
+            
+            <div style={{ 
+              display: "flex",
+              alignItems: "center",
+              gap: "1rem",
+              marginBottom: "1.5rem"
+            }}>
+              <div style={{
+                width: "60px",
+                height: "60px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                animation: "pulse 3s infinite"
+              }}>
+                <GraduationCap size={28} color="white" />
+              </div>
+              <div>
+                <h4 style={{ 
+                  fontSize: "1.25rem",
+                  fontWeight: "600",
+                  marginBottom: "0.25rem",
+                  color: "white"
+                }}>
+                  Banusha Balasubramaniyam
+                </h4>
+                <p style={{ 
+                  fontSize: "0.875rem",
+                  color: "#93C5FD"
+                }}>
+                  Civil Engineer & 3D Specialist
+                </p>
+              </div>
+            </div>
+
+            <ul style={{
+              listStyle: "none",
+              padding: 0,
+              margin: 0
+            }}>
+              {instructorFeatures.map((feature, index) => (
+                <li 
+                  key={index}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                    padding: "0.5rem 0",
+                    fontSize: "0.95rem",
+                    color: "#d1fae5"
+                  }}
+                >
+                  <div style={{ color: "#3B82F6" }}>
+                    {feature.icon}
+                  </div>
+                  {feature.text}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <button style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            padding: "1rem 1.5rem",
+            background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+            border: "none",
+            borderRadius: "12px",
+            color: "white",
+            fontWeight: "600",
+            cursor: "pointer",
+            transition: "all 0.3s ease",
+            boxShadow: "0 8px 25px rgba(59, 130, 246, 0.3)",
+            margin: "0 auto"
+          }}>
+            <Play size={18} />
+            Watch Workshop Preview
+          </button>
+        </div>
+      </div>
+
+      {/* Right Panel - Login Form */}
+      <div style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "2rem",
+        minHeight: "100vh"
+      }}>
+        <div ref={loginRef} style={{
+          width: "100%",
+          maxWidth: "450px",
+          background: "rgba(255, 255, 255, 0.08)",
+          backdropFilter: "blur(20px)",
+          borderRadius: "24px",
+          padding: "3rem",
+          border: "1px solid rgba(255, 255, 255, 0.15)",
+          boxShadow: "0 25px 50px rgba(0, 0, 0, 0.3)",
+          opacity: 0,
+          transform: "translateX(50px)",
+          transition: "all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s",
+          zIndex: 10
+        }}>
+          {/* Logo */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.75rem",
+            marginBottom: "2rem"
+          }}>
+            <div style={{
+              width: "2.5rem",
+              height: "2.5rem",
+              borderRadius: "12px",
+              background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 8px 25px rgba(59, 130, 246, 0.3)",
+              animation: "pulse 2s infinite"
+            }}>
+              <Box size={20} color="white" />
+            </div>
+            <h1 style={{
+              fontSize: "1.5rem",
+              fontWeight: "700",
+              background: "linear-gradient(45deg, #3B82F6, #10B981, #ffffff)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              margin: 0,
+            }}>
+              MODUNO
+            </h1>
+          </div>
+
+          {/* Header */}
+          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+            <h2 style={{
+              fontSize: "1.75rem",
+              fontWeight: "700",
+              marginBottom: "0.5rem",
+              background: "linear-gradient(135deg, #ffffff 0%, #93C5FD 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}>
+              Welcome Back
+            </h2>
+            <p style={{ color: "#93C5FD", fontSize: "0.95rem" }}>
+              Sign in to continue your 3D learning journey
             </p>
-          </LoginCard>
-        </FormContainer>
-      </RightPanel>
-    </Container>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              padding: "0.75rem 1rem",
+              background: "rgba(220, 38, 38, 0.1)",
+              border: "1px solid rgba(220, 38, 38, 0.3)",
+              borderRadius: "12px",
+              marginBottom: "1.5rem"
+            }}>
+              <AlertCircle size={18} color="#fca5a5" style={{ marginRight: "0.5rem" }} />
+              <span style={{ color: "#fca5a5", fontSize: "0.875rem" }}>{error}</span>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit}>
+            {/* Email Field */}
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: "500",
+                color: "#93C5FD",
+                marginBottom: "0.5rem"
+              }}>
+                Email Address
+              </label>
+              <div style={{ position: "relative" }}>
+                <div style={{
+                  position: "absolute",
+                  left: "1rem",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#3B82F6"
+                }}>
+                  <Mail size={18} />
+                </div>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  placeholder="you@example.com"
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "0.875rem 1rem 0.875rem 2.75rem",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: "12px",
+                    color: "white",
+                    fontSize: "0.95rem",
+                    transition: "all 0.2s ease"
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Password Field */}
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: "500",
+                color: "#93C5FD",
+                marginBottom: "0.5rem"
+              }}>
+                Password
+              </label>
+              <div style={{ position: "relative" }}>
+                <div style={{
+                  position: "absolute",
+                  left: "1rem",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#3B82F6"
+                }}>
+                  <Lock size={18} />
+                </div>
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  placeholder="••••••••"
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "0.875rem 1rem 0.875rem 2.75rem",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: "12px",
+                    color: "white",
+                    fontSize: "0.95rem",
+                    transition: "all 0.2s ease"
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Remember Me & Forgot Password */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1.5rem",
+              fontSize: "0.875rem"
+            }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  style={{
+                    width: "1rem",
+                    height: "1rem",
+                    accentColor: "#10B981",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    cursor: "pointer"
+                  }}
+                />
+                <span style={{ color: "#93C5FD" }}>Remember me</span>
+              </label>
+              <Link to="/forgot-password" style={{
+                color: "#93C5FD",
+                textDecoration: "none",
+                fontWeight: "500",
+                transition: "all 0.2s ease"
+              }}>
+                Forgot password?
+              </Link>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: "100%",
+                padding: "1rem",
+                background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                border: "none",
+                borderRadius: "12px",
+                color: "white",
+                fontWeight: "600",
+                fontSize: "1rem",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem",
+                transition: "all 0.3s ease",
+                boxShadow: "0 8px 25px rgba(59, 130, 246, 0.3)",
+                marginBottom: "1.5rem"
+              }}
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  <Zap size={18} />
+                  Sign In
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            margin: "1.5rem 0",
+            color: "#93C5FD"
+          }}>
+            <div style={{ flex: 1, height: "1px", background: "rgba(255, 255, 255, 0.1)" }}></div>
+            <span style={{ padding: "0 1rem", fontSize: "0.75rem", fontWeight: "500" }}>OR CONTINUE WITH</span>
+            <div style={{ flex: 1, height: "1px", background: "rgba(255, 255, 255, 0.1)" }}></div>
+          </div>
+
+          {/* Social Login */}
+          <div style={{
+            display: "flex",
+            justifyContent: "center",
+            marginBottom: "1.5rem"
+          }}>
+            <GoogleLogin
+              onSuccess={handleGoogleLoginSuccess}
+              onError={() => setError('Google login failed')}
+              theme="filled_blue"
+              size="large"
+              shape="pill"
+            />
+          </div>
+
+          {/* Sign Up Link */}
+          <p style={{
+            textAlign: "center",
+            color: "#93C5FD",
+            fontSize: "0.875rem",
+            marginTop: "1.5rem"
+          }}>
+            Don't have an account?{' '}
+            <Link to="/register" style={{
+              color: "#3B82F6",
+              fontWeight: "600",
+              textDecoration: "none",
+              transition: "all 0.2s ease"
+            }}>
+              Sign up now
+            </Link>
+          </p>
+        </div>
+      </div>
+
+      {/* CSS Animations */}
+      <style jsx global>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+        
+        @keyframes pulse {
+          0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+          70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        
+        @keyframes glow {
+          0% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+          100% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.6); }
+        }
+        
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
+    </div>
   );
 };
 

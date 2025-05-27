@@ -1,9 +1,7 @@
+"use client"
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Box, Mail, AlertCircle, Loader2, CheckCircle, 
-  ArrowLeft, Lock, Key, ChevronLeft 
-} from 'lucide-react';
+import { Box, Mail, AlertCircle, Loader2, CheckCircle, ArrowLeft, Lock, Key, ChevronLeft, Zap } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
@@ -21,19 +19,54 @@ const ForgotPassword = () => {
   const [step, setStep] = useState(1); // 1: email, 2: OTP, 3: new password
   const [resendDisabled, setResendDisabled] = useState(false);
   const [resendTimer, setResendTimer] = useState(30);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Simple fade-in animation using CSS transitions
-    if (formRef.current) {
-      formRef.current.style.opacity = '0';
-      formRef.current.style.transform = 'translateY(20px)';
-      
-      setTimeout(() => {
-        formRef.current.style.transition = 'all 0.6s ease-out';
-        formRef.current.style.opacity = '1';
-        formRef.current.style.transform = 'translateY(0)';
-      }, 100);
+    // Animation on mount
+    setTimeout(() => {
+      setIsVisible(true);
+    }, 100);
+
+    // Add floating particles to background
+    const particles = [];
+    for (let i = 0; i < 20; i++) {
+      const particle = document.createElement('div');
+      particle.style.position = 'fixed';
+      particle.style.width = `${Math.random() * 4 + 2}px`;
+      particle.style.height = `${Math.random() * 4 + 2}px`;
+      particle.style.background = `rgba(${Math.random() > 0.5 ? "59, 130, 246" : "16, 185, 129"}, 0.3)`;
+      particle.style.borderRadius = '50%';
+      particle.style.left = `${Math.random() * 100}%`;
+      particle.style.top = `${Math.random() * 100}%`;
+      particle.style.animation = `float ${Math.random() * 10 + 5}s ease-in-out infinite`;
+      particle.style.animationDelay = `${Math.random() * 5}s`;
+      particle.style.pointerEvents = 'none';
+      particle.style.zIndex = '0';
+      document.body.appendChild(particle);
+      particles.push(particle);
     }
+
+    // Intersection observer for animations
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.style.opacity = 1;
+            entry.target.style.transform = 'translateY(0)';
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    if (formRef.current) {
+      observer.observe(formRef.current);
+    }
+
+    return () => {
+      particles.forEach(p => p.remove());
+      observer.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -87,105 +120,102 @@ const ForgotPassword = () => {
     }
   };
 
- const handleVerifyOtp = async (e) => {
-  e.preventDefault();
-  setError('');
-  setMessage('');
-  
-  // Validate inputs
-  if (!email || !otp || otp.length !== 6) {
-    setError('Please enter a valid email and 6-digit OTP');
-    toast.error('Please enter a valid email and 6-digit OTP');
-    return;
-  }
-
-  setLoading(true);
-  
-  try {
-    const res = await axios.post('http://localhost:1111/api/v1/verify-otp', 
-      { 
-        email: email.toLowerCase().trim(), 
-        code: otp.trim()  // Changed from 'otp' to 'code' to match backend expectation
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
     
-    localStorage.setItem('resetToken', res.data.data.resetToken);
-    setMessage(res.data.message);
-    setStep(3);
-    toast.success('OTP verified successfully');
-  } catch (err) {
-    console.error('OTP verification error:', err.response?.data);
-    const errorMsg = err.response?.data?.message || 'Invalid OTP';
-    setError(errorMsg);
-    toast.error(errorMsg);
-  } finally {
-    setLoading(false);
-  }
-}; 
-
-const handleResetPassword = async (e) => {
-  e.preventDefault();
-  setError('');
-  setMessage('');
-  
-  // Validate inputs
-  if (newPassword !== confirmPassword) {
-    setError('Passwords do not match');
-    return;
-  }
-
-  if (newPassword.length < 8) {
-    setError('Password must be at least 8 characters');
-    return;
-  }
-
-  setLoading(true);
-  
-  try {
-    const resetToken = localStorage.getItem('resetToken');
-    if (!resetToken) {
-      throw new Error('Session expired. Please start the password reset process again.');
+    if (!email || !otp || otp.length !== 6) {
+      setError('Please enter a valid email and 6-digit OTP');
+      toast.error('Please enter a valid email and 6-digit OTP');
+      return;
     }
 
-    const res = await axios.post('http://localhost:1111/api/v1/reset-password', 
-      { 
-        resetToken,
-        newPassword 
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
+    setLoading(true);
+    
+    try {
+      const res = await axios.post('http://localhost:1111/api/v1/verify-otp', 
+        { 
+          email: email.toLowerCase().trim(), 
+          code: otp.trim()
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
         }
+      );
+      
+      localStorage.setItem('resetToken', res.data.data.resetToken);
+      setMessage(res.data.message);
+      setStep(3);
+      toast.success('OTP verified successfully');
+    } catch (err) {
+      console.error('OTP verification error:', err.response?.data);
+      const errorMsg = err.response?.data?.message || 'Invalid OTP';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  }; 
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+    
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const resetToken = localStorage.getItem('resetToken');
+      if (!resetToken) {
+        throw new Error('Session expired. Please start the password reset process again.');
       }
-    );
-    
-    // Clear the reset token after successful reset
-    localStorage.removeItem('resetToken');
-    
-    setMessage(res.data.message);
-    toast.success('Password reset successfully');
-    setTimeout(() => {
-      navigate('/login');
-    }, 2000);
-  } catch (err) {
-    const errorMsg = err.response?.data?.message || err.message || 'Error resetting password';
-    setError(errorMsg);
-    toast.error(errorMsg);
-    
-    // If token is invalid, reset the flow
-    if (errorMsg.includes('token') || errorMsg.includes('expired')) {
+
+      const res = await axios.post('http://localhost:1111/api/v1/reset-password', 
+        { 
+          resetToken,
+          newPassword 
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
       localStorage.removeItem('resetToken');
-      setStep(1);
+      
+      setMessage(res.data.message);
+      toast.success('Password reset successfully');
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || 'Error resetting password';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      
+      if (errorMsg.includes('token') || errorMsg.includes('expired')) {
+        localStorage.removeItem('resetToken');
+        setStep(1);
+      }
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
+
   const renderStep = () => {
     switch (step) {
       case 1:
@@ -193,44 +223,46 @@ const handleResetPassword = async (e) => {
           <>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <h2 style={{
-                fontSize: '1.5rem',
+                fontSize: '1.75rem',
                 fontWeight: '700',
-                marginBottom: '0.75rem'
-              }}>Reset your password</h2>
-              <p style={{
+                marginBottom: '0.5rem',
+                background: 'linear-gradient(135deg, #ffffff 0%, #93C5FD 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}>
+                Reset Your Password
+              </h2>
+              <p style={{ 
                 color: '#93C5FD',
-                fontSize: '0.875rem',
+                fontSize: '0.95rem',
                 lineHeight: '1.6'
               }}>
-                Enter your email address to receive a verification code
+                Enter your email to receive a verification code
               </p>
             </div>
 
             <form onSubmit={handleSendOtp} style={{ marginBottom: '1.5rem' }}>
               <div style={{ marginBottom: '1.5rem' }}>
-                <label 
-                  htmlFor="email" 
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: '#93C5FD',
-                    marginBottom: '0.5rem'
-                  }}
-                >
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#93C5FD',
+                  marginBottom: '0.5rem'
+                }}>
                   Email Address
                 </label>
                 <div style={{ position: 'relative' }}>
                   <div style={{
                     position: 'absolute',
+                    left: '1rem',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    left: '1rem'
+                    color: '#3B82F6'
                   }}>
-                    <Mail size={18} style={{ color: '#4ade80' }} />
+                    <Mail size={18} />
                   </div>
                   <input
-                    id="email"
                     type="email"
                     required
                     value={email}
@@ -238,14 +270,12 @@ const handleResetPassword = async (e) => {
                     placeholder="you@example.com"
                     style={{
                       width: '100%',
-                      height: '3rem',
-                      paddingLeft: '2.75rem',
-                      paddingRight: '1rem',
+                      padding: '0.875rem 1rem 0.875rem 2.75rem',
                       background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '0.5rem',
+                      borderRadius: '12px',
                       color: 'white',
-                      outline: 'none',
+                      fontSize: '0.95rem',
                       transition: 'all 0.2s ease'
                     }}
                   />
@@ -257,19 +287,20 @@ const handleResetPassword = async (e) => {
                 disabled={loading}
                 style={{
                   width: '100%',
-                  padding: '0.875rem 0',
-                  borderRadius: '0.5rem',
-                  background: 'linear-gradient(135deg, #0B2545 0%, #172A57 100%)',
+                  padding: '1rem',
+                  background: 'linear-gradient(135deg, #3B82F6 0%, #10B981 100%)',
+                  border: 'none',
+                  borderRadius: '12px',
                   color: 'white',
                   fontWeight: '600',
-                  border: 'none',
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
                   display: 'flex',
-                  justifyContent: 'center',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: '0.5rem',
-                  transition: 'all 0.2s ease',
-                  opacity: loading ? 0.7 : 1,
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
                   marginBottom: '1.5rem'
                 }}
               >
@@ -278,7 +309,12 @@ const handleResetPassword = async (e) => {
                     <Loader2 size={20} className="animate-spin" />
                     Sending OTP...
                   </>
-                ) : 'Send OTP'}
+                ) : (
+                  <>
+                    <Zap size={18} />
+                    Send OTP
+                  </>
+                )}
               </button>
             </form>
           </>
@@ -306,13 +342,18 @@ const handleResetPassword = async (e) => {
 
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <h2 style={{
-                fontSize: '1.5rem',
+                fontSize: '1.75rem',
                 fontWeight: '700',
-                marginBottom: '0.75rem'
-              }}>Verify OTP</h2>
-              <p style={{
+                marginBottom: '0.5rem',
+                background: 'linear-gradient(135deg, #ffffff 0%, #93C5FD 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}>
+                Verify OTP
+              </h2>
+              <p style={{ 
                 color: '#93C5FD',
-                fontSize: '0.875rem',
+                fontSize: '0.95rem',
                 lineHeight: '1.6'
               }}>
                 Enter the 6-digit code sent to {email}
@@ -321,50 +362,44 @@ const handleResetPassword = async (e) => {
 
             <form onSubmit={handleVerifyOtp} style={{ marginBottom: '1.5rem' }}>
               <div style={{ marginBottom: '1.5rem' }}>
-                <label 
-                  htmlFor="otp" 
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: '#93C5FD',
-                    marginBottom: '0.5rem'
-                  }}
-                >
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#93C5FD',
+                  marginBottom: '0.5rem'
+                }}>
                   Verification Code
                 </label>
                 <div style={{ position: 'relative' }}>
                   <div style={{
                     position: 'absolute',
+                    left: '1rem',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    left: '1rem'
+                    color: '#3B82F6'
                   }}>
-                    <Key size={18} style={{ color: '#4ade80' }} />
+                    <Key size={18} />
                   </div>
                   <input
-                    id="otp"
                     type="text"
                     required
                     maxLength="6"
                     pattern="\d{6}"
                     value={otp}
-                     onChange={(e) => {
-    // Only allow numbers and ensure max length
-    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setOtp(value);
-  }}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      setOtp(value);
+                    }}
                     placeholder="123456"
                     style={{
                       width: '100%',
-                      height: '3rem',
-                      paddingLeft: '2.75rem',
-                      paddingRight: '1rem',
+                      padding: '0.875rem 1rem 0.875rem 2.75rem',
                       background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '0.5rem',
+                      borderRadius: '12px',
                       color: 'white',
-                      outline: 'none',
+                      fontSize: '0.95rem',
                       transition: 'all 0.2s ease'
                     }}
                   />
@@ -376,19 +411,20 @@ const handleResetPassword = async (e) => {
                 disabled={loading}
                 style={{
                   width: '100%',
-                  padding: '0.875rem 0',
-                  borderRadius: '0.5rem',
-                  background: 'linear-gradient(135deg, #0B2545 0%, #172A57 100%)',
+                  padding: '1rem',
+                  background: 'linear-gradient(135deg, #3B82F6 0%, #10B981 100%)',
+                  border: 'none',
+                  borderRadius: '12px',
                   color: 'white',
                   fontWeight: '600',
-                  border: 'none',
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
                   display: 'flex',
-                  justifyContent: 'center',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: '0.5rem',
-                  transition: 'all 0.2s ease',
-                  opacity: loading ? 0.7 : 1,
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
                   marginBottom: '1rem'
                 }}
               >
@@ -446,13 +482,18 @@ const handleResetPassword = async (e) => {
 
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <h2 style={{
-                fontSize: '1.5rem',
+                fontSize: '1.75rem',
                 fontWeight: '700',
-                marginBottom: '0.75rem'
-              }}>Set New Password</h2>
-              <p style={{
+                marginBottom: '0.5rem',
+                background: 'linear-gradient(135deg, #ffffff 0%, #93C5FD 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}>
+                Set New Password
+              </h2>
+              <p style={{ 
                 color: '#93C5FD',
-                fontSize: '0.875rem',
+                fontSize: '0.95rem',
                 lineHeight: '1.6'
               }}>
                 Create a new password for your account
@@ -461,29 +502,26 @@ const handleResetPassword = async (e) => {
 
             <form onSubmit={handleResetPassword} style={{ marginBottom: '1.5rem' }}>
               <div style={{ marginBottom: '1.5rem' }}>
-                <label 
-                  htmlFor="newPassword" 
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: '#93C5FD',
-                    marginBottom: '0.5rem'
-                  }}
-                >
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#93C5FD',
+                  marginBottom: '0.5rem'
+                }}>
                   New Password
                 </label>
                 <div style={{ position: 'relative' }}>
                   <div style={{
                     position: 'absolute',
+                    left: '1rem',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    left: '1rem'
+                    color: '#3B82F6'
                   }}>
-                    <Lock size={18} style={{ color: '#4ade80' }} />
+                    <Lock size={18} />
                   </div>
                   <input
-                    id="newPassword"
                     type="password"
                     required
                     minLength="8"
@@ -492,14 +530,12 @@ const handleResetPassword = async (e) => {
                     placeholder="••••••••"
                     style={{
                       width: '100%',
-                      height: '3rem',
-                      paddingLeft: '2.75rem',
-                      paddingRight: '1rem',
+                      padding: '0.875rem 1rem 0.875rem 2.75rem',
                       background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '0.5rem',
+                      borderRadius: '12px',
                       color: 'white',
-                      outline: 'none',
+                      fontSize: '0.95rem',
                       transition: 'all 0.2s ease'
                     }}
                   />
@@ -507,29 +543,26 @@ const handleResetPassword = async (e) => {
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>
-                <label 
-                  htmlFor="confirmPassword" 
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: '#93C5FD',
-                    marginBottom: '0.5rem'
-                  }}
-                >
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#93C5FD',
+                  marginBottom: '0.5rem'
+                }}>
                   Confirm Password
                 </label>
                 <div style={{ position: 'relative' }}>
                   <div style={{
                     position: 'absolute',
+                    left: '1rem',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    left: '1rem'
+                    color: '#3B82F6'
                   }}>
-                    <Lock size={18} style={{ color: '#4ade80' }} />
+                    <Lock size={18} />
                   </div>
                   <input
-                    id="confirmPassword"
                     type="password"
                     required
                     minLength="8"
@@ -538,14 +571,12 @@ const handleResetPassword = async (e) => {
                     placeholder="••••••••"
                     style={{
                       width: '100%',
-                      height: '3rem',
-                      paddingLeft: '2.75rem',
-                      paddingRight: '1rem',
+                      padding: '0.875rem 1rem 0.875rem 2.75rem',
                       background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '0.5rem',
+                      borderRadius: '12px',
                       color: 'white',
-                      outline: 'none',
+                      fontSize: '0.95rem',
                       transition: 'all 0.2s ease'
                     }}
                   />
@@ -553,14 +584,28 @@ const handleResetPassword = async (e) => {
               </div>
 
               <button
-        type="submit"
-        disabled={loading || !newPassword || !confirmPassword || newPassword !== confirmPassword || newPassword.length < 8}
-        style={{
-          /* your button styles */
-          opacity: (loading || !newPassword || !confirmPassword || newPassword !== confirmPassword || newPassword.length < 8) ? 0.7 : 1,
-          cursor: (loading || !newPassword || !confirmPassword || newPassword !== confirmPassword || newPassword.length < 8) ? 'not-allowed' : 'pointer'
-        }}
-      >
+                type="submit"
+                disabled={loading || !newPassword || !confirmPassword || newPassword !== confirmPassword || newPassword.length < 8}
+                style={{
+                  width: '100%',
+                  padding: '1rem',
+                  background: 'linear-gradient(135deg, #3B82F6 0%, #10B981 100%)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  color: 'white',
+                  fontWeight: '600',
+                  fontSize: '1rem',
+                  cursor: (loading || !newPassword || !confirmPassword || newPassword !== confirmPassword || newPassword.length < 8) ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
+                  marginBottom: '1.5rem',
+                  opacity: (loading || !newPassword || !confirmPassword || newPassword !== confirmPassword || newPassword.length < 8) ? 0.7 : 1
+                }}
+              >
                 {loading ? (
                   <>
                     <Loader2 size={20} className="animate-spin" />
@@ -578,125 +623,158 @@ const handleResetPassword = async (e) => {
 
   return (
     <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      background: 'linear-gradient(135deg, #0B2545 0%, #172A57 50%, #1E3A8A 100%)',
-      padding: '1rem',
-      fontFamily: 'Inter, system-ui, sans-serif'
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #0B2545 0%, #172A57 50%, #1E3A8A 100%)",
+      fontFamily: "Inter, system-ui, sans-serif",
+      color: "white",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      position: "relative",
+      overflow: "hidden",
+      padding: "2rem"
     }}>
+      {/* Animated Background Elements */}
+      <div style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        zIndex: 0,
+      }}></div>
+
+      {/* Main Card */}
       <div ref={formRef} style={{
-        width: '100%',
-        maxWidth: '28rem',
-        padding: '1rem'
+        width: "100%",
+        maxWidth: "450px",
+        background: "rgba(255, 255, 255, 0.08)",
+        backdropFilter: "blur(20px)",
+        borderRadius: "24px",
+        padding: "3rem",
+        border: "1px solid rgba(255, 255, 255, 0.15)",
+        boxShadow: "0 25px 50px rgba(0, 0, 0, 0.3)",
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? "translateY(0)" : "translateY(20px)",
+        transition: "all 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
+        zIndex: 10
       }}>
-        <Link to="/" style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '2rem',
-          gap: '0.75rem',
-          textDecoration: 'none'
+        {/* Logo */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "0.75rem",
+          marginBottom: "2rem"
         }}>
           <div style={{
-            width: '2.5rem',
-            height: '2.5rem',
-            borderRadius: '8px',
-            background: 'linear-gradient(135deg, #0B2545 0%, #172A57 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
+            width: "2.5rem",
+            height: "2.5rem",
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 8px 25px rgba(59, 130, 246, 0.3)",
+            animation: "pulse 2s infinite"
           }}>
             <Box size={20} color="white" />
           </div>
-          <div>
-            <h1 style={{
-              fontSize: '1.25rem',
-              fontWeight: '700',
-              background: 'linear-gradient(to right, #3B82F6, #ffffff)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              margin: 0
-            }}>
-              MODUNO LMS
-            </h1>
-          </div>
-        </Link>
-        
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '1rem',
-          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          padding: '2rem',
-          color: 'white'
-        }}>
-          {message && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '1rem',
-              background: 'rgba(5, 150, 105, 0.1)',
-              border: '1px solid rgba(5, 150, 105, 0.3)',
-              borderRadius: '0.5rem',
-              color: '#93C5FD',
-              marginBottom: '1.5rem'
-            }}>
-              <CheckCircle size={18} style={{ marginRight: '0.75rem', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.875rem' }}>{message}</span>
-            </div>
-          )}
-
-          {error && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '1rem',
-              background: 'rgba(220, 38, 38, 0.1)',
-              border: '1px solid rgba(220, 38, 38, 0.3)',
-              borderRadius: '0.5rem',
-              color: '#fca5a5',
-              marginBottom: '1.5rem'
-            }}>
-              <AlertCircle size={18} style={{ marginRight: '0.75rem', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.875rem' }}>{error}</span>
-            </div>
-          )}
-
-          {renderStep()}
-
-          {step === 1 && (
-            <Link to="/login" style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              color: '#93C5FD',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              padding: '0.5rem'
-            }}>
-              <ArrowLeft size={16} />
-              Back to login
-            </Link>
-          )}
-        </div>
-        
-        <div style={{
-          textAlign: 'center',
-          marginTop: '1.5rem'
-        }}>
-          <p style={{
-            fontSize: '0.75rem',
-            color: '#d1fae5'
+          <h1 style={{
+            fontSize: "1.5rem",
+            fontWeight: "700",
+            background: "linear-gradient(45deg, #3B82F6, #10B981, #ffffff)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            margin: 0,
           }}>
-            © 2025 Moduno Pvt Ltd. All rights reserved.
-          </p>
+            MODUNO
+          </h1>
         </div>
+
+        {/* Messages */}
+        {message && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "1rem",
+            background: "rgba(16, 185, 129, 0.1)",
+            border: "1px solid rgba(16, 185, 129, 0.3)",
+            borderRadius: "12px",
+            color: "#93C5FD",
+            marginBottom: "1.5rem"
+          }}>
+            <CheckCircle size={18} style={{ marginRight: "0.75rem", flexShrink: 0 }} />
+            <span style={{ fontSize: "0.875rem" }}>{message}</span>
+          </div>
+        )}
+
+        {error && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "1rem",
+            background: "rgba(220, 38, 38, 0.1)",
+            border: "1px solid rgba(220, 38, 38, 0.3)",
+            borderRadius: "12px",
+            color: "#fca5a5",
+            marginBottom: "1.5rem"
+          }}>
+            <AlertCircle size={18} style={{ marginRight: "0.75rem", flexShrink: 0 }} />
+            <span style={{ fontSize: "0.875rem" }}>{error}</span>
+          </div>
+        )}
+
+        {/* Current Step */}
+        {renderStep()}
+
+        {/* Back to Login Link */}
+        {step === 1 && (
+          <Link to="/login" style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+            color: "#93C5FD",
+            textDecoration: "none",
+            fontSize: "0.875rem",
+            fontWeight: "500",
+            marginTop: "1.5rem"
+          }}>
+            <ArrowLeft size={16} />
+            Back to login
+          </Link>
+        )}
       </div>
+
+      {/* CSS Animations */}
+      <style jsx global>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+        
+        @keyframes pulse {
+          0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+          70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
     </div>
   );
 };

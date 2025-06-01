@@ -11,8 +11,131 @@ const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE });
 };
 
+// Helper function for email signature
+const getEmailSignature = () => `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Best regards,
+The Moduno Team
 
+📧 Support: moduno58@gmail.com
+📱 WhatsApp: +94 742145537
 
+This is an automated message. Please do not reply directly to this email.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+
+// Helper function for email templates
+const getEmailTemplate = (type, data) => {
+  const currentDate = new Date().toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+
+  switch(type) {
+    case 'register':
+      return {
+        subject: '🎉 Welcome to Moduno - Start Your Learning Journey',
+        message: `Dear ${data.name},
+
+Welcome to Moduno! 
+
+Account Details:
+━━━━━━━━━━━━━━━━
+📧 Email: ${data.email}
+👤 Role: ${data.role}
+📅 Created: ${currentDate}
+⏰ Trial Period: 3 days (Expires on ${data.subscriptionExpiry.toDateString()})
+
+⚠️ Important Notice:
+━━━━━━━━━━━━━━━━
+• Your trial is valid for 3 days only
+• Trial expires on ${data.subscriptionExpiry.toDateString()}
+• Contact admin to upgrade your account
+• Don't lose access to your learning materials
+
+🔄 How to Upgrade:
+━━━━━━━━━━━━━━
+Contact our admin:
+• WhatsApp: +94 742145537
+• Email: moduno58@gmail.com
+
+Please include:
+• Your email: ${data.email}
+• Request: Account Upgrade
+
+Need Help?
+━━━━━━━━
+Contact our support team:
+• WhatsApp: +94 742145537
+• Email: moduno58@gmail.com
+${getEmailSignature()}`
+      };
+
+    case 'login':
+      return {
+        subject: '🔐 New Login - Moduno Account',
+        message: `Dear ${data.name},
+
+We detected a new login to your Moduno account.
+
+Login Details:
+━━━━━━━━━━━━
+📅 Date: ${currentDate}
+🕒 Time: ${new Date().toLocaleTimeString()}
+
+⚠️ Important:
+━━━━━━━━━━
+If this wasn't you, contact us immediately:
+• WhatsApp: +94 742145537
+• Email: moduno58@gmail.com
+
+💡 Upgrade Account:
+━━━━━━━━━━━━━━
+Contact admin for premium access:
+• WhatsApp: +94 742145537
+• Email: moduno58@gmail.com
+${getEmailSignature()}`
+      };
+
+    case 'forgot_password':
+      return {
+        subject: '🔑 Password Reset - Moduno',
+        message: `Dear ${data.name},
+
+We received a request to reset your password.
+
+Reset Details:
+━━━━━━━━━━━━
+📅 Date: ${currentDate}
+🕒 Time: ${new Date().toLocaleTimeString()}
+🔑 Reset Code: ${data.resetCode}
+⏰ Expires: In 10 minutes
+
+Steps:
+━━━━━
+1. Enter code: ${data.resetCode}
+2. Set new password
+3. Save changes
+
+Important:
+━━━━━━━━
+• Code expires in 10 minutes
+• Never share this code
+• Ignore if you didn't request this
+
+Need Help?
+━━━━━━━━
+Contact our support:
+• WhatsApp: +94 742145537
+• Email: moduno58@gmail.com
+${getEmailSignature()}`
+      };
+
+    default:
+      return null;
+  }
+};
 
 exports.googleLogin = async (req, res) => {
   try {
@@ -100,11 +223,6 @@ exports.linkedinAuth = (req, res) => {
   res.redirect(redirectUrl);
 };
 
-
-
-
-
-
 // @desc   Register new user (student)
 // @route  POST /api/auth/register
 // @access Public
@@ -112,25 +230,27 @@ exports.register = async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
-    // Check if user exists
     let user = await User.findOne({ email });
     if (user) return res.status(400).json({ message: 'Email already registered' });
 
-    // Create new student user
     user = await User.create({ name, email, password, role: 'student' });
-
-    // Set subscription expiry 30 days from now
-    user.subscriptionExpiry = new Date(Date.now() + 30*24*60*60*1000);
+    // Set trial period to 3 days
+    user.subscriptionExpiry = new Date(Date.now() + 3*24*60*60*1000);
     await user.save();
-console.log('Sending welcome email to:', user.email);
-    // Send welcome email
-    await sendEmail({
+
+    const emailTemplate = getEmailTemplate('register', {
+      name: user.name,
       email: user.email,
-      subject: 'Welcome to Moduno LMS',
-      message: `Your subscription is active until ${user.subscriptionExpiry.toDateString()}`
+      role: user.role,
+      subscriptionExpiry: user.subscriptionExpiry
     });
 
-    // Return token & user info
+    await sendEmail({
+      email: user.email,
+      subject: emailTemplate.subject,
+      message: emailTemplate.message
+    });
+
     const token = generateToken(user._id);
     res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (error) {
@@ -153,10 +273,22 @@ exports.login = async (req, res) => {
     const isMatch = await user.matchPassword(password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-    // Check subscription expiry
     if (user.subscriptionExpiry < new Date()) {
       return res.status(403).json({ message: 'Your subscription has expired' });
     }
+
+    // Send login notification email
+    const emailTemplate = getEmailTemplate('login', {
+      name: user.name,
+      location: req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+      device: req.headers['user-agent']
+    });
+
+    await sendEmail({
+      email: user.email,
+      subject: emailTemplate.subject,
+      message: emailTemplate.message
+    });
 
     const token = generateToken(user._id);
     res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
@@ -182,20 +314,15 @@ const generateOTP = () => {
 exports.forgotPassword = asyncHandler(async (req, res, next) => {
   const { email } = req.body;
 
-  // 1. Check if user exists
   const user = await User.findOne({ email });
   if (!user) {
     return next(new ErrorResponse('No user found with that email', 404));
   }
 
-  // 2. Generate 6-digit OTP
   const otpCode = generateOTP();
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-  // 3. Delete any existing OTPs for this email/purpose
   await OTP.deleteMany({ email, purpose: 'password_reset' });
-
-  // 4. Save OTP to database
   await OTP.create({
     email,
     code: otpCode,
@@ -203,23 +330,25 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
     purpose: 'password_reset'
   });
 
-  // 5. Send email with OTP
-  const message = `Your password reset OTP is: ${otpCode}\nThis code will expire in 10 minutes.`;
+  // Send enhanced password reset email
+  const emailTemplate = getEmailTemplate('forgot_password', {
+    name: user.name,
+    resetCode: otpCode
+  });
   
   try {
     await sendEmail({
       email: user.email,
-      subject: 'Your Password Reset OTP',
-      message
+      subject: emailTemplate.subject,
+      message: emailTemplate.message
     });
 
     res.status(200).json({
       success: true,
-      message: 'OTP sent to email',
+      message: 'Password reset instructions sent to email',
       data: { email }
     });
   } catch (err) {
-    // Remove the OTP if email fails to send
     await OTP.findOneAndDelete({ email, code: otpCode });
     return next(new ErrorResponse('Email could not be sent', 500));
   }
@@ -403,10 +532,6 @@ exports.logoutUser=(req,res,next)=>{
     )
 }
 
-
-
-
-
 // @desc    Get current user profile
 // @route   GET /api/v1/auth/me
 // @access  Private
@@ -482,7 +607,6 @@ const sendTokenResponse = (user, statusCode, res) => {
       }
     });
 };
-
 
 exports.verifyToken = async (req, res) => {
   try {

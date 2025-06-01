@@ -118,28 +118,246 @@ const UsersPage = () => {
     fetchUsers();
   }, []);
 
-  // Send email notification
+  // Enhanced email notification function with professional templates
   const sendUserNotification = async (email, action, details = {}) => {
     try {
       let subject, message;
+      const currentDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
       
+      const getEmailSignature = () => `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Best regards,
+The Moduno Team
+
+📧 Support: moduno58@gmail.com
+📱 WhatsApp: +94 742145537
+
+This is an automated message. Please do not reply directly to this email.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+
       switch(action) {
         case 'create':
-          subject = 'Your account has been created';
-          message = `Hello ${details.name},\n\nYour account has been successfully created with the following details:\n\nEmail: ${details.email}\nRole: ${details.role}\n\nThank you for joining us!`;
+          subject = '🎉 Welcome to Moduno - Your Account Has Been Created';
+          message = `Dear ${details.name},
+
+We're excited to welcome you to Moduno! Your account has been successfully created.
+
+Account Details:
+━━━━━━━━━━━━━━━━
+📧 Email: ${details.email}
+👤 Role: ${details.role}
+📅 Created: ${currentDate}
+
+Getting Started:
+━━━━━━━━━━━━━
+1. Log in to your account
+2. Complete your profile information
+3. Browse our course catalog
+4. Start your learning journey!
+
+Security Tips:
+━━━━━━━━━━━━
+• Change your password after first login
+• Enable two-factor authentication
+• Never share your login credentials
+
+Need Help?
+━━━━━━━━
+If you have any questions or need assistance, our support team is here to help!
+Contact us on WhatsApp: +94 742145537
+${getEmailSignature()}`;
           break;
+
         case 'update':
-          subject = 'Your account has been updated';
-          message = `Hello ${details.name},\n\nYour account details have been updated:\n\nEmail: ${details.email}\nRole: ${details.role}\nStatus: ${details.isBanned ? 'Banned' : 'Active'}\n\nIf you didn't request these changes, please contact support immediately.`;
+          subject = '🔄 Moduno Account Update Notification';
+          message = `Dear ${details.name},
+
+This is to confirm that your account details have been updated.
+
+Updated Account Information:
+━━━━━━━━━━━━━━━━━━━━━━━━
+📧 Email: ${details.email}
+👤 Role: ${details.role}
+📅 Updated: ${currentDate}
+📊 Status: ${details.isBanned ? '🚫 Account Restricted' : '✅ Active'}
+
+If you did not request these changes, please contact our support team immediately.
+
+Account Security:
+━━━━━━━━━━━━━━
+• Review your recent account activity
+• Update your password if necessary
+• Contact support if you notice anything suspicious
+
+Need immediate assistance?
+━━━━━━━━━━━━━━━━━━━
+Contact us on WhatsApp: +94 742145537
+${getEmailSignature()}`;
           break;
+
         case 'delete':
-          subject = 'Your account has been deleted';
-          message = `Hello,\n\nYour account with email ${email} has been deleted from our system.\n\nIf this was a mistake, please contact our support team.`;
+          subject = '👋 Moduno Account Deletion Confirmation';
+          message = `Dear User,
+
+We're sorry to see you go. This email confirms that your account (${email}) has been deleted from our system.
+
+Important Information:
+━━━━━━━━━━━━━━━━━━━
+📅 Deletion Date: ${currentDate}
+📚 Course Progress: Archived
+📊 Account Status: Deactivated
+
+Please Note:
+━━━━━━━━━
+• All your personal data has been removed
+• Any active subscriptions have been cancelled
+• Course progress is no longer accessible
+
+If this was a mistake or you wish to rejoin:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Contact our admin team on WhatsApp: +94 742145537
+• We may be able to restore your account and data
+${getEmailSignature()}`;
           break;
+
         case 'ban':
-          subject = `Your account has been ${details.isBanned ? 'banned' : 'unbanned'}`;
-          message = `Hello ${details.name},\n\nYour account has been ${details.isBanned ? 'banned' : 'unbanned'} by an administrator.\n\n${details.isBanned ? 'You will no longer be able to access the platform.' : 'Your access has been restored.'}`;
+          subject = details.isBanned ? '🚫 Moduno Account Access Restricted' : '✅ Moduno Account Access Restored';
+          message = details.isBanned ? 
+            `Dear ${details.name},
+
+Important Notice: Your Moduno account access has been restricted.
+
+Account Status:
+━━━━━━━━━━━━━
+📅 Date: ${currentDate}
+📊 Status: Restricted
+👤 Account: ${email}
+
+Possible Restriction Reasons:
+━━━━━━━━━━━━━━━━━━━━━
+• Free trial period has expired
+• Suspicious activity detected on your account
+• Multiple login attempts from different locations
+• Violation of our terms of service
+• Payment issues or subscription expiry
+
+What This Means:
+━━━━━━━━━━━━━
+• Your access to the platform is temporarily suspended
+• Course progress is frozen until resolution
+• Account features are limited
+
+Next Steps:
+━━━━━━━━━
+1. Review your subscription status
+2. Check for any payment issues
+3. Verify your account security
+4. Contact Moduno admin for immediate assistance
+
+To Resolve This:
+━━━━━━━━━━━━
+Contact Moduno Admin directly:
+• WhatsApp: +94 742145537
+• Email: moduno58@gmail.com
+
+When contacting us, please provide:
+• Your account email
+• Recent account activity
+• Any payment confirmations (if applicable)
+• Description of any issues you've noticed
+
+We're here to help resolve this quickly and restore your access if appropriate.
+
+Note: If this restriction is due to a free trial expiration, you can restore access by upgrading to a paid subscription.
+${getEmailSignature()}`
+            : 
+            `Dear ${details.name},
+
+Good news! Your Moduno account access has been restored.
+
+Account Status:
+━━━━━━━━━━━━━
+📅 Date: ${currentDate}
+📊 Status: Active
+👤 Account: ${email}
+
+What's Next:
+━━━━━━━━━
+1. Log in to your account
+2. Review your course progress
+3. Resume your learning journey
+4. Update your security settings
+
+Welcome back to Moduno! We're glad to have you with us again.
+
+Need assistance?
+━━━━━━━━━━━━━
+Contact us on WhatsApp: +94 742145537
+Email: moduno58@gmail.com
+${getEmailSignature()}`;
           break;
+
+        case 'login':
+          subject = '🔐 New Login to Your Moduno Account';
+          message = `Dear ${details.name},
+
+We detected a new login to your Moduno account.
+
+Login Details:
+━━━━━━━━━━━━
+📅 Date: ${currentDate}
+🌐 Location: ${details.location || 'Unknown'}
+💻 Device: ${details.device || 'Unknown'}
+
+If this wasn't you:
+━━━━━━━━━━━━━
+1. Change your password immediately
+2. Enable two-factor authentication
+3. Contact our support team on WhatsApp: +94 742145537
+
+Security Tips:
+━━━━━━━━━━━━
+• Use a strong, unique password
+• Never share your login credentials
+• Regularly review your account activity
+${getEmailSignature()}`;
+          break;
+
+        case 'forgot_password':
+          subject = '🔑 Moduno Password Reset Request';
+          message = `Dear ${details.name},
+
+We received a request to reset your Moduno account password.
+
+Reset Information:
+━━━━━━━━━━━━━━━━
+📅 Request Date: ${currentDate}
+🔑 Reset Code: ${details.resetCode}
+⏰ Code Expires: In 30 minutes
+
+To Reset Your Password:
+━━━━━━━━━━━━━━━━━━
+1. Enter your email address
+2. Enter the reset code above
+3. Create your new password
+
+Important:
+━━━━━━━━
+• This reset code expires in 30 minutes
+• If you didn't request this, please ignore this email
+• Contact support if you notice suspicious activity
+
+Need immediate help?
+━━━━━━━━━━━━━━━━
+Contact us on WhatsApp: +94 742145537
+${getEmailSignature()}`;
+          break;
+
         default:
           return;
       }
@@ -154,6 +372,7 @@ const UsersPage = () => {
 
     } catch (error) {
       console.error("Failed to send notification email:", error);
+      toast.error("Failed to send email notification");
     }
   };
 

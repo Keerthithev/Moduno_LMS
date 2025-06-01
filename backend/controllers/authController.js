@@ -15,54 +15,74 @@ const generateToken = (id) => {
 
 
 exports.googleLogin = async (req, res) => {
-  const { token } = req.body;
-console.log('Received Google token:', token);
-  if (!token) {
-    return res.status(400).json({ message: 'Google token is required' });
-  }
-
   try {
-    // Verify the token sent from the client with Google
-    const ticket = await client.verifyIdToken({
-      idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-
-    const payload = ticket.getPayload();
-console.log('Google payload:', payload);
-    // Find user by email
-    let user = await User.findOne({ email: payload.email });
-
-    if (!user) {
-      // Create user if does not exist
-      user = await User.create({
-        name: payload.name,
-        email: payload.email,
-        googleId: payload.sub,
-        // Add any other default fields here
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Token is required' 
       });
     }
 
-    // Generate JWT for your own app
-    const tokenApp = generateToken(user._id);
-
-    // Send back token and user info
-    return res.json({
-      token: tokenApp,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-      },
+    // Verify the Google token
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID
     });
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    try {
+      // Find or create user
+      let user = await User.findOne({ email });
+      
+      if (!user) {
+        // Create new user without password
+        user = await User.create({
+          googleId,
+          email,
+          name,
+          role: 'student',
+          subscriptionExpiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days trial
+        });
+      } else if (!user.googleId) {
+        // If user exists but doesn't have googleId, update it
+        user.googleId = googleId;
+        await user.save();
+      }
+
+      // Generate JWT token
+      const jwtToken = generateToken(user._id);
+
+      res.status(200).json({
+        success: true,
+        token: jwtToken,
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        }
+      });
+    } catch (dbError) {
+      console.error('Database operation failed:', dbError);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create or update user',
+        error: dbError.message
+      });
+    }
   } catch (error) {
-    console.error('Google token verification error:', error);
-    return res.status(401).json({ message: 'Invalid Google token' });
+    console.error('Google login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Google authentication failed',
+      error: error.message
+    });
   }
 };
-
-
-
 
 // controllers/authController.js
 
@@ -104,12 +124,11 @@ exports.register = async (req, res) => {
     await user.save();
 console.log('Sending welcome email to:', user.email);
     // Send welcome email
-   if (!user.email) {
-  console.error('No email address for user:', user);
-} else {
-    console.log('Sending welcome email to:', user.email);
-  await sendEmail(user.email, 'Welcome to Moduno LMS', `Your subscription is active until ${user.subscriptionExpiry.toDateString()}`);
-}
+    await sendEmail({
+      email: user.email,
+      subject: 'Welcome to Moduno LMS',
+      message: `Your subscription is active until ${user.subscriptionExpiry.toDateString()}`
+    });
 
     // Return token & user info
     const token = generateToken(user._id);
@@ -462,4 +481,25 @@ const sendTokenResponse = (user, statusCode, res) => {
         role: user.role
       }
     });
+};
+
+
+exports.verifyToken = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split("Bearer ")[1];
+    if (!token) {
+      return res.status(401).json({ valid: false, message: "No token provided" });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded) {
+      return res.status(401).json({ valid: false, message: "Invalid token" });
+    }
+
+    res.status(200).json({ valid: true, userId: decoded.id });
+  } catch (error) {
+    console.error("Token verification error:", error);
+    res.status(401).json({ valid: false, message: "Token verification failed" });
+  }
 };

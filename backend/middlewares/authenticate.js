@@ -1,29 +1,50 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const ErrorResponse = require('../utils/errorHandler');
 
-const authenticate = async (req, res, next) => {
-  let token;
+const authenticate = {
+    // Protect routes
+    isAuthenticatedUser: async (req, res, next) => {
+        try {
+            let token;
 
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
+            if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+                token = req.headers.authorization.split(' ')[1];
+            } else if (req.cookies.token) {
+                token = req.cookies.token;
+            }
 
-  if (!token) {
-    return res.status(401).json({ message: 'Not authorized, no token' });
-  }
+            if (!token) {
+                return next(new ErrorResponse('Not authorized to access this route', 401));
+            }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
-    if (!user) {
-      return res.status(401).json({ message: 'User not found' });
+            try {
+                // Verify token
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                req.user = await User.findById(decoded.id);
+                next();
+            } catch (err) {
+                return next(new ErrorResponse('Not authorized to access this route', 401));
+            }
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    // Grant access to specific roles
+    authorizeRoles: (...roles) => {
+        return (req, res, next) => {
+            if (!req.user || !roles.includes(req.user.role)) {
+                return next(
+                    new ErrorResponse(
+                        `User role ${req.user ? req.user.role : 'UNDEFINED'} is not authorized to access this route`,
+                        403
+                    )
+                );
+            }
+            next();
+        };
     }
-
-    req.user = user; // Attach user object
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: 'Token is not valid' });
-  }
 };
 
 module.exports = authenticate;

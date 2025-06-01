@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import axios from "axios"
 import {
   Trash2,
@@ -18,8 +18,15 @@ import {
   SortAsc,
   Eye,
   BookOpen,
+  Plus,
+  GraduationCap,
+  Loader2,
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { toast } from "react-toastify"
+import CoursePlayer from "../CoursePlayer"
+import DashboardLayout from '../shared/DashboardLayout'
+
 const formatBytes = (bytes) => {
   if (bytes === 0) return "0 B"
   const k = 1024
@@ -60,32 +67,159 @@ const AdminCourseList = () => {
   const [videoTitle, setVideoTitle] = useState("")
   const [uploadError, setUploadError] = useState("")
 
+  const [previewMode, setPreviewMode] = useState(false)
+  const [previewCourse, setPreviewCourse] = useState(null)
+  const [previewVideo, setPreviewVideo] = useState(null)
+
+  const [stats, setStats] = useState({
+    totalVideos: 0,
+    totalDuration: 0,
+    totalEnrollments: 0
+  });
+
+  const [sortOpen, setSortOpen] = useState(false);
+  const [sortBy, setSortBy] = useState('title');
+  const [sortOrder, setSortOrder] = useState('asc');
+
+  // Sort options
+  const sortOptions = [
+    { label: 'Title', value: 'title' },
+    { label: 'Price', value: 'price' },
+    { label: 'Duration', value: 'duration' },
+    { label: 'Created Date', value: 'createdAt' }
+  ];
 
   const navigate = useNavigate()
   useEffect(() => {
-    // Check if user is admin on mount
-    const user = JSON.parse(localStorage.getItem("user"))
+    const user = JSON.parse(localStorage.getItem("user"));
+    console.log('Current user:', user);
 
     if (!user || user.role !== "admin") {
-      alert("Access denied: Admins only")
-      navigate("/login")  // or any other page
-      return
+      toast.error("Access denied: Admins only");
+      navigate("/login");
+      return;
     }
 
-    fetchCourses()
-  }, [])
+    // Separate the API calls
+    const fetchData = async () => {
+      try {
+        await fetchCourses();
+        await fetchAllEnrollments();
+      } catch (error) {
+        console.error("Error in fetchData:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const fetchAllEnrollments = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const user = JSON.parse(localStorage.getItem("user"));
+      
+      console.log('Using token:', token);
+
+      // Get enrollments for admin
+      const enrollmentsRes = await axios.get(`http://localhost:1111/api/v1/courses/enrollments`, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Raw enrollments response:', enrollmentsRes);
+      console.log('Enrollments data:', enrollmentsRes?.data);
+
+      if (!enrollmentsRes.data || !enrollmentsRes.data.data) {
+        console.error('Invalid enrollment response structure:', enrollmentsRes);
+        throw new Error('Invalid enrollment data structure received');
+      }
+
+      const enrollments = enrollmentsRes.data.data;
+      console.log('Parsed enrollments:', enrollments);
+
+      // Update the stats with just the enrollment count
+      setStats(prev => {
+        const newStats = {
+          ...prev,
+          totalEnrollments: enrollments.length
+        };
+        console.log('Updating stats to:', newStats);
+        return newStats;
+      });
+
+    } catch (error) {
+      console.error("Failed to fetch enrollments:", error);
+      console.error("Error response:", error.response);
+      console.error("Error data:", error.response?.data);
+      toast.error(
+        "Failed to load enrollment data: " + 
+        (error.response?.data?.message || error.message)
+      );
+    }
+  };
 
   const fetchCourses = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const res = await axios.get("http://localhost:1111/api/v1/courses")
-      setCourses(res.data.data)
+      const token = localStorage.getItem("token");
+      const res = await axios.get("http://localhost:1111/api/v1/courses", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const normalizedCourses = (res.data.data || []).map(course => ({
+        ...course,
+        videos: normalizeVideos(course)
+      }));
+
+      // Calculate total videos and duration
+      const totalStats = normalizedCourses.reduce((acc, course) => {
+        const courseVideos = normalizeVideos(course);
+        return {
+          totalVideos: acc.totalVideos + courseVideos.length,
+          totalDuration: acc.totalDuration + (parseFloat(course.duration) || 0)
+        };
+      }, { totalVideos: 0, totalDuration: 0 });
+
+      setStats(prev => ({
+        ...prev,
+        totalVideos: totalStats.totalVideos,
+        totalDuration: totalStats.totalDuration
+      }));
+
+      setCourses(normalizedCourses);
     } catch (error) {
-      alert("Failed to load courses")
+      toast.error("Failed to load courses");
+      console.error("Failed to load courses:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+
+  const normalizeVideos = (course) => {
+    // Handle both section-based and direct video array structures
+    if (course.sections && course.sections.length > 0) {
+      return course.sections.flatMap(section => 
+        (section.videos || []).map(video => ({
+          ...video,
+          url: video.videoUrl || video.url,
+          title: video.title,
+          sectionId: section._id,
+          sectionTitle: section.title
+        }))
+      );
+    } else if (course.videos && course.videos.length > 0) {
+      return course.videos.map(video => ({
+        ...video,
+        url: video.videoUrl || video.url,
+        title: video.title,
+        sectionId: 'default',
+        sectionTitle: 'Main Section'
+      }));
+    }
+    return [];
+  };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this course?")) return
@@ -250,449 +384,512 @@ const AdminCourseList = () => {
   }
 };
 
- const filteredCourses = courses.filter((course) => {
-  const title = course.title || ""
-  const description = course.description || ""
+  const handlePreview = (course) => {
+    const normalizedVideos = normalizeVideos(course);
+    if (normalizedVideos.length > 0) {
+      const previewCourseData = {
+        ...course,
+        sections: [{
+          _id: 'default',
+          title: 'Main Section',
+          videos: normalizedVideos
+        }]
+      };
+      setPreviewCourse(previewCourseData);
+      setPreviewVideo(normalizedVideos[0]);
+      setPreviewMode(true);
+    } else {
+      toast.error("No videos available for preview");
+    }
+  };
 
-  return (
-    title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    description.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-})
+  // Sort courses
+  const sortCourses = (a, b) => {
+    const multiplier = sortOrder === 'asc' ? 1 : -1;
+    
+    switch (sortBy) {
+      case 'title':
+        return multiplier * (a.title || '').localeCompare(b.title || '');
+      case 'price':
+        return multiplier * ((a.price || 0) - (b.price || 0));
+      case 'duration':
+        return multiplier * ((a.duration || 0) - (b.duration || 0));
+      case 'createdAt':
+        return multiplier * (new Date(a.createdAt) - new Date(b.createdAt));
+      default:
+        return 0;
+    }
+  };
 
+  // Apply search and sort
+  const filteredCourses = courses
+    .filter(course => 
+      (course.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (course.description || '').toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort(sortCourses);
+
+  // Reset sort
+  const resetSort = () => {
+    setSortBy('title');
+    setSortOrder('asc');
+    setSortOpen(false);
+  };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-20">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600 border-b-4 border-blue-100 mx-auto"></div>
-          <p className="mt-4 text-gray-600 font-medium text-lg">Loading courses...</p>
+      <DashboardLayout>
+        <div className="flex justify-center items-center py-20">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600 border-b-4 border-blue-100 mx-auto"></div>
+            <p className="mt-4 text-gray-600 font-medium text-lg">Loading courses...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Course Management
-            </h1>
-            <p className="text-gray-600 text-lg mt-2">Manage and monitor your course content</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
-              <Filter className="h-4 w-4 mr-2 text-gray-500" />
-              <span className="font-medium text-gray-700">Filter</span>
-            </button>
-            <button className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
-              <SortAsc className="h-4 w-4 mr-2 text-gray-500" />
-              <span className="font-medium text-gray-700">Sort</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search courses..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
+  if (previewMode && previewCourse && previewVideo) {
+    return (
+      <DashboardLayout>
+        <div className="min-h-screen" style={{
+          background: "linear-gradient(135deg, #0B2545 0%, #172A57 50%, #1E3A8A 100%)",
+        }}>
+          <CoursePlayer
+            course={previewCourse}
+            initialVideo={previewVideo}
+            onBack={() => {
+              setPreviewMode(false);
+              setPreviewCourse(null);
+              setPreviewVideo(null);
+            }}
+            isPreview={true}
           />
         </div>
+      </DashboardLayout>
+    );
+  }
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white rounded-2xl p-6 shadow-lg border-0">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Video className="h-6 w-6 text-blue-600" />
-              </div>
+  return (
+    <DashboardLayout>
+      <div className="min-h-screen" style={{
+        background: "linear-gradient(135deg, #0B2545 0%, #172A57 50%, #1E3A8A 100%)",
+        fontFamily: "Inter, system-ui, sans-serif",
+        color: "white",
+      }}>
+        <div className="max-w-7xl mx-auto p-6 space-y-8">
+          {/* Header */}
+          <div className="flex flex-col space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
               <div>
-                <p className="text-3xl font-bold text-gray-900">{courses.length}</p>
-                <p className="text-sm text-gray-500">Total Courses</p>
+                <h1 className="text-4xl font-bold" style={{
+                  background: "linear-gradient(45deg, #3B82F6, #10B981, #ffffff)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}>
+                  Course Management
+                </h1>
+                <p className="text-[#93C5FD] text-lg mt-2">Manage and monitor your course content</p>
               </div>
             </div>
-          </div>
-          <div className="bg-white rounded-2xl p-6 shadow-lg border-0">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                <Users className="h-6 w-6 text-green-600" />
+
+            {/* Search and Sort Row */}
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div className="relative max-w-md w-full">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[#93C5FD]" />
+                <input
+                  type="text"
+                  placeholder="Search courses..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent transition-all duration-300"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.1)",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    backdropFilter: "blur(10px)",
+                    color: "white",
+                  }}
+                />
               </div>
-              <div>
-                <p className="text-3xl font-bold text-gray-900">1,234</p>
-                <p className="text-sm text-gray-500">Total Students</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl p-6 shadow-lg border-0">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                <Clock className="h-6 w-6 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-gray-900">
-                  {courses.reduce((acc, course) => acc + (course.duration || 0), 0)}h
-                </p>
-                <p className="text-sm text-gray-500">Total Duration</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl p-6 shadow-lg border-0">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-                <Play className="h-6 w-6 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-gray-900">
-                  {courses.reduce((acc, course) => acc + (course.videos?.length || 0), 0)}
-                </p>
-                <p className="text-sm text-gray-500">Total Videos</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Courses Grid */}
-        {filteredCourses.length === 0 ? (
-          <div className="bg-white rounded-3xl p-16 shadow-lg text-center">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Video className="h-10 w-10 text-gray-400" />
-            </div>
-            <h3 className="text-2xl font-semibold mb-4 text-gray-900">No courses found</h3>
-            <p className="text-gray-600 mb-8 text-lg max-w-md mx-auto">
-              {searchTerm ? "Try adjusting your search terms" : "Create your first course to get started"}
-            </p>
-            <button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg">
-              <BookOpen className="h-5 w-5 mr-2 inline" />
-              Create Course
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredCourses.map((course) => {
-              const isEditing = editingCourseId === course._id
+              <div className="relative">
+                <button
+                  onClick={() => setSortOpen(!sortOpen)}
+                  className="flex items-center px-4 py-2 rounded-xl transition-all duration-300 hover:scale-105"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.1)",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    backdropFilter: "blur(10px)",
+                  }}>
+                  <SortAsc className="h-4 w-4 mr-2 text-[#93C5FD]" />
+                  <span className="text-[#93C5FD]">Sort</span>
+                </button>
 
-              return (
-                <div
-                  key={course._id}
-                  className="group overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white rounded-3xl"
-                >
-                  {isEditing ? (
-                    <div className="p-8 space-y-6">
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700">Course Title</label>
-                        <input
-                          type="text"
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          placeholder="Course title"
-                          className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700">Description</label>
-                        <textarea
-                          rows={3}
-                          value={editDescription}
-                          onChange={(e) => setEditDescription(e.target.value)}
-                          placeholder="Course description"
-                          className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700">Duration (hours)</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={editDuration}
-                          onChange={(e) => setEditDuration(e.target.value)}
-                          placeholder="Duration"
-                          className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-
-                      {/* Videos Section */}
-                      <div className="space-y-3">
-                        <label className="block text-sm font-semibold text-gray-700">
-                          Videos ({editVideos.length})
-                        </label>
-                        {editVideos.length > 0 && (
-                          <div className="max-h-32 overflow-y-auto space-y-2">
-                            {editVideos.map((video, idx) => (
-                              <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                                <span className="text-sm truncate font-medium">{video.title}</span>
-                                <button
-                                  onClick={() => removeVideoFromEdit(idx)}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1 rounded-lg transition-colors"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Video Upload */}
-                      <div className="space-y-3 p-4 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
-                        <label className="block text-sm font-semibold text-gray-700">Add New Video</label>
-                        {uploadError && <p className="text-sm text-red-600 font-medium">{uploadError}</p>}
-                        <input
-                          type="text"
-                          placeholder="Video title"
-                          value={videoTitle}
-                          onChange={(e) => setVideoTitle(e.target.value)}
-                          disabled={uploading}
-                          className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                        <input
-                          type="file"
-                          accept="video/*"
-                          onChange={(e) => setVideoFile(e.target.files[0])}
-                          disabled={uploading}
-                          className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-
-                        {uploading && (
-                          <div className="space-y-2">
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${uploadProgress}%` }}
-                              />
-                            </div>
-                            <div className="flex justify-between text-xs text-gray-600">
-                              <span>Speed: {uploadSpeed}</span>
-                              <span>{uploadProgress}%</span>
-                              <span>Time left: {timeLeft}</span>
-                            </div>
-                          </div>
-                        )}
-
-                        <button
-                          onClick={uploadVideo}
-                          disabled={uploading || !videoFile || !videoTitle.trim()}
-                          className={`w-full py-3 rounded-xl text-white font-semibold transition-all duration-300 ${
-                            uploading || !videoFile || !videoTitle.trim()
-                              ? "bg-gray-300 cursor-not-allowed"
-                              : "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 transform hover:scale-105"
-                          }`}
+                {sortOpen && (
+                  <div className="absolute right-0 mt-2 w-48 rounded-xl shadow-lg z-50"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.1)",
+                      border: "1px solid rgba(255, 255, 255, 0.2)",
+                      backdropFilter: "blur(20px)",
+                    }}>
+                    <div className="p-4 space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-[#93C5FD] mb-2">Sort By</label>
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white"
                         >
-                          <Upload className="h-4 w-4 mr-2 inline" />
-                          {uploading ? "Uploading..." : "Upload Video"}
-                        </button>
+                          {sortOptions.map(option => (
+                            <option key={option.value} value={option.value} className="bg-gray-800">{option.label}</option>
+                          ))}
+                        </select>
                       </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex space-x-3 pt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-[#93C5FD] mb-2">Order</label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setSortOrder('asc')}
+                            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                              sortOrder === 'asc' 
+                                ? 'bg-blue-500 text-white' 
+                                : 'bg-white/10 text-white hover:bg-white/20'
+                            }`}
+                          >
+                            Asc
+                          </button>
+                          <button
+                            onClick={() => setSortOrder('desc')}
+                            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                              sortOrder === 'desc' 
+                                ? 'bg-blue-500 text-white' 
+                                : 'bg-white/10 text-white hover:bg-white/20'
+                            }`}
+                          >
+                            Desc
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end space-x-2">
                         <button
-                          onClick={saveEdit}
-                          disabled={editSaving}
-                          className="flex-1 py-3 rounded-xl bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold hover:from-green-700 hover:to-green-800 transition-all duration-300 transform hover:scale-105"
+                          onClick={resetSort}
+                          className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors"
                         >
-                          <Check className="h-4 w-4 mr-2 inline" />
-                          {editSaving ? "Saving..." : "Save"}
+                          Reset
                         </button>
                         <button
-                          onClick={cancelEditing}
-                          disabled={editSaving}
-                          className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition-all duration-300 transform hover:scale-105"
+                          onClick={() => setSortOpen(false)}
+                          className="px-4 py-2 rounded-lg text-sm font-medium text-white"
+                          style={{
+                            background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                          }}
                         >
-                          <X className="h-4 w-4 mr-2 inline" />
-                          Cancel
+                          Apply
                         </button>
                       </div>
                     </div>
-                  ) : (
-                    <>
-                      {/* Course Thumbnail */}
-                      <div className="relative h-48 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700" />
-                        <div className="absolute inset-0 bg-black/20" />
-                        <div className="absolute top-4 right-4">
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/90 text-gray-700">
-                            {course.videos?.length || 0} videos
-                          </span>
-                        </div>
-                        <div className="absolute bottom-4 left-4 text-white">
-                          <div className="flex items-center space-x-2">
-                            <Video className="h-5 w-5" />
-                            <span className="text-sm font-medium">Course</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="p-6">
-                        <div className="space-y-4">
-                          <div>
-                            <h3 className="font-bold text-xl leading-tight line-clamp-2 group-hover:text-blue-600 transition-colors">
-                              {course.title}
-                            </h3>
-                            <p className="text-sm text-gray-600 line-clamp-2 mt-2">{course.description}</p>
-                          </div>
-
-                          <div className="flex items-center justify-between text-sm text-gray-500">
-                            <div className="flex items-center">
-                              <Clock className="h-4 w-4 mr-1" />
-                              <span>{course.duration || 0}h</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Users className="h-4 w-4 mr-1" />
-                              <span>0 students</span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-2">
-                            <button
-                              onClick={() => {
-                                setSelectedCourse(course)
-                                setShowVideoModal(true)
-                              }}
-                              className="flex items-center px-4 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors font-medium"
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              Preview
-                            </button>
-
-                            <div className="relative">
-                              <button className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-                                <MoreVertical className="h-4 w-4 text-gray-500" />
-                              </button>
-                              {/* Dropdown menu would go here */}
-                            </div>
-                          </div>
-
-                          <div className="flex space-x-2 pt-2">
-                            <button
-                              onClick={() => startEditing(course)}
-                              className="flex-1 py-2 px-4 bg-yellow-50 text-yellow-700 rounded-xl hover:bg-yellow-100 transition-colors font-medium"
-                            >
-                              <Edit className="h-4 w-4 mr-2 inline" />
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDelete(course._id)}
-                              className="flex-1 py-2 px-4 bg-red-50 text-red-700 rounded-xl hover:bg-red-100 transition-colors font-medium"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2 inline" />
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-  {showVideoModal && selectedCourse && (
-  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div 
-      className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-8"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-2xl font-bold text-gray-900">{selectedCourse.title} - Videos</h3>
-        <button
-          onClick={() => setShowVideoModal(false)}
-          className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-        >
-          <X className="h-6 w-6 text-gray-500" />
-        </button>
-      </div>
-
-      {/* Get all videos from course */}
-      {(() => {
-        // Method to extract all videos regardless of structure
-        const getAllVideos = (course) => {
-          let videos = [];
-          
-          // Check flat videos array first
-          if (course.videos && Array.isArray(course.videos)) {
-            videos = [...course.videos];
-          }
-          
-          // Check sections for nested videos
-          if (course.sections && Array.isArray(course.sections)) {
-            course.sections.forEach(section => {
-              if (section.videos && Array.isArray(section.videos)) {
-                videos = [...videos, ...section.videos];
-              }
-            });
-          }
-          
-          return videos;
-        };
-
-        const videos = getAllVideos(selectedCourse);
-        
-        if (videos.length === 0) {
-          return (
-            <div className="text-center py-12">
-              <Video className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 text-lg">No videos uploaded yet.</p>
-            </div>
-          );
-        }
-
-        return (
-          <div className="space-y-6">
-            {videos.map((video, idx) => (
-              <div key={`video-${idx}`} className="bg-gray-50 rounded-2xl p-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-lg text-gray-900">
-                      {video.title || `Untitled Video ${idx + 1}`}
-                    </h4>
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                      Video {idx + 1}
-                    </span>
                   </div>
-                  {video.url || video.videoUrl ? (
-                    <div className="relative aspect-video">
-                      <video
-                        src={video.url || video.videoUrl}
-                        controls
-                        controlsList="nodownload"
-                        className="w-full h-full rounded-xl shadow-lg"
-                        poster={video.thumbnail}
-                        onError={(e) => {
-                          e.target.parentElement.innerHTML = `
-                            <div class="bg-red-50 p-4 rounded-lg text-red-700 text-center">
-                              Failed to load video: ${video.title || 'Untitled Video'}<br>
-                              URL: ${video.url || video.videoUrl || 'None'}
-                            </div>
-                          `;
-                        }}
-                      />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="rounded-2xl p-6 transition-all duration-300 group hover:scale-105"
+              style={{
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(59, 130, 246, 0.3)",
+                backdropFilter: "blur(20px)",
+              }}>
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+                  style={{
+                    background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                  }}>
+                  <BookOpen className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-white">{courses.length}</p>
+                  <p className="text-sm text-[#93C5FD]">Total Courses</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl p-6 transition-all duration-300 group hover:scale-105"
+              style={{
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(59, 130, 246, 0.3)",
+                backdropFilter: "blur(20px)",
+              }}>
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+                  style={{
+                    background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                  }}>
+                  <Clock className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-white">{stats.totalDuration}h</p>
+                  <p className="text-sm text-[#93C5FD]">Total Duration</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl p-6 transition-all duration-300 group hover:scale-105"
+              style={{
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(59, 130, 246, 0.3)",
+                backdropFilter: "blur(20px)",
+              }}>
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+                  style={{
+                    background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                  }}>
+                  <Play className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-white">{stats.totalVideos}</p>
+                  <p className="text-sm text-[#93C5FD]">Total Videos</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Courses Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredCourses.map((course) => (
+              <div key={course._id} className="group overflow-hidden rounded-2xl transition-all duration-300 hover:scale-105"
+                style={{
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  backdropFilter: "blur(20px)",
+                }}>
+                <div className="relative h-48">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#3B82F6] to-[#10B981]" />
+                  <div className="absolute inset-0 bg-black/20" />
+                  <div className="absolute bottom-4 left-4 text-white">
+                    <div className="flex items-center space-x-2">
+                      <GraduationCap className="h-5 w-5" />
+                      <span className="text-sm font-medium">Course</span>
                     </div>
-                  ) : (
-                    <div className="bg-yellow-50 p-4 rounded-lg text-yellow-700">
-                      Video URL missing (needs either url or videoUrl property)
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  <h3 className="text-xl font-bold text-white group-hover:text-[#3B82F6] transition-colors">
+                    {course.title}
+                  </h3>
+                  <p className="text-[#93C5FD] line-clamp-2">{course.description}</p>
+
+                  <div className="flex items-center justify-between text-sm text-[#93C5FD]">
+                    <div className="flex items-center">
+                      <Clock className="h-4 w-4 mr-1" />
+                      <span>{course.duration || 0}h</span>
                     </div>
-                  )}
+                    <div className="flex items-center">
+                      <Video className="h-4 w-4 mr-1" />
+                      <span>{normalizeVideos(course).length} videos</span>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-2 pt-2">
+                    <button
+                      onClick={() => handlePreview(course)}
+                      className="flex-1 py-2 px-4 rounded-xl font-medium transition-all duration-300 hover:scale-105"
+                      style={{
+                        background: "rgba(59, 130, 246, 0.2)",
+                        color: "#3B82F6",
+                        border: "1px solid rgba(59, 130, 246, 0.3)",
+                      }}>
+                      <Eye className="h-4 w-4 mr-2 inline" />
+                      Preview
+                    </button>
+                    <button
+                      onClick={() => startEditing(course)}
+                      className="flex-1 py-2 px-4 rounded-xl font-medium transition-all duration-300 hover:scale-105"
+                      style={{
+                        background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                      }}>
+                      <Edit className="h-4 w-4 mr-2 inline" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(course._id)}
+                      className="flex-1 py-2 px-4 rounded-xl font-medium bg-red-500 hover:bg-red-600 transition-all duration-300 hover:scale-105">
+                      <Trash2 className="h-4 w-4 mr-2 inline" />
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
-        );
-      })()}
-    </div>
-  </div>
-)}      </div>
-    </div>
+        </div>
+
+        {/* Add Edit Modal */}
+        {editingCourseId && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              style={{
+                background: "rgba(255, 255, 255, 0.1)",
+                backdropFilter: "blur(20px)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+              }}>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-white">Edit Course</h3>
+                <button onClick={cancelEditing} className="text-gray-400 hover:text-white">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-[#93C5FD] mb-2">
+                    Course Title
+                  </label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter course title"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#93C5FD] mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter course description"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#93C5FD] mb-2">
+                    Duration (hours)
+                  </label>
+                  <input
+                    type="number"
+                    value={editDuration}
+                    onChange={(e) => setEditDuration(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter duration in hours"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#93C5FD] mb-2">
+                    Videos
+                  </label>
+                  <div className="space-y-4">
+                    {editVideos.map((video, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-white/10 border border-white/20">
+                        <div className="flex items-center space-x-3">
+                          <Video className="h-5 w-5 text-[#93C5FD]" />
+                          <span className="text-white">{video.title}</span>
+                        </div>
+                        <button
+                          onClick={() => removeVideoFromEdit(idx)}
+                          className="text-red-500 hover:text-red-400"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 p-4 rounded-lg border border-dashed border-white/20">
+                    <div className="space-y-4">
+                      <input
+                        type="text"
+                        value={videoTitle}
+                        onChange={(e) => setVideoTitle(e.target.value)}
+                        className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter video title"
+                      />
+                      <input
+                        type="file"
+                        accept="video/*"
+                        onChange={(e) => setVideoFile(e.target.files[0])}
+                        className="w-full text-[#93C5FD]"
+                      />
+                      {uploadError && (
+                        <p className="text-red-500 text-sm">{uploadError}</p>
+                      )}
+                      <button
+                        onClick={uploadVideo}
+                        disabled={uploading}
+                        className="w-full py-2 px-4 rounded-lg font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{
+                          background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                        }}
+                      >
+                        {uploading ? (
+                          <div className="flex items-center justify-center">
+                            <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                            Uploading...
+                          </div>
+                        ) : (
+                          "Upload Video"
+                        )}
+                      </button>
+                      {uploading && (
+                        <div className="space-y-2">
+                          <div className="w-full bg-white/10 rounded-full h-2">
+                            <div
+                              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-sm text-[#93C5FD]">
+                            <span>{uploadProgress}%</span>
+                            <span>{uploadSpeed}</span>
+                            <span>{timeLeft}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-4">
+                  <button
+                    onClick={saveEdit}
+                    disabled={editSaving}
+                    className="flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                    }}
+                  >
+                    {editSaving ? (
+                      <div className="flex items-center justify-center">
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        Saving...
+                      </div>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </button>
+                  <button
+                    onClick={cancelEditing}
+                    className="flex-1 py-3 px-4 rounded-xl font-medium bg-red-500 hover:bg-red-600 transition-all duration-300 hover:scale-105"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
   )
 }
 

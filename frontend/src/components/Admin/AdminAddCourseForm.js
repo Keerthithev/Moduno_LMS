@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from "react"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
-import { Upload, X, Plus, Check, FileVideo, Clock, AlertCircle } from "lucide-react"
+import { Upload, X, Plus, Check, FileVideo, Clock, AlertCircle, Video, BookOpen, GraduationCap } from "lucide-react"
+import { toast } from 'react-toastify'
 
 const formatBytes = (bytes) => {
   if (bytes === 0) return "0 B"
@@ -78,14 +79,13 @@ const AdminAddCourseForm = ({ onCourseAdded }) => {
   const [duration, setDuration] = useState("")
 
   // Sections state (with videos nested inside)
- const [sections, setSections] = useState([
-  {
-    title: "Default Section Title",  // Set default non-empty title here
-    description: "",
-    videos: [],
-  }
-])
-
+  const [sections, setSections] = useState([
+    {
+      title: "Default Section Title",  // Set default non-empty title here
+      description: "",
+      videos: [],
+    }
+  ])
 
   // Upload state
   const [videoTitle, setVideoTitle] = useState("")
@@ -131,33 +131,30 @@ const AdminAddCourseForm = ({ onCourseAdded }) => {
 
   // Add uploaded video to first section by default
   const addVideoToSection = (video) => {
-  setSections(prevSections => {
-    if (!video.title || !video.videoUrl) {
-  console.error("Invalid video object:", video)
-  return
-}
-
-    const updatedSections = prevSections.map((section, index) => {
-      if (index === 0) {
-        return {
-          ...section,
-          videos: [...(section.videos || []), {
-            title: video.title,
-            videoUrl: video.videoUrl,
-            description: "",
-            duration: 0,
-            isPreview: false,
-          }]
-        }
+    setSections(prevSections => {
+      if (!video.title || !video.videoUrl) {
+        console.error("Invalid video object:", video)
+        return
       }
-      return section
+
+      const updatedSections = prevSections.map((section, index) => {
+        if (index === 0) {
+          return {
+            ...section,
+            videos: [...(section.videos || []), {
+              title: video.title,
+              videoUrl: video.videoUrl,
+              description: "",
+              duration: 0,
+              isPreview: false,
+            }]
+          }
+        }
+        return section
+      })
+      return updatedSections
     })
-    return updatedSections
-  })
-}
-
-
-
+  }
 
   // Upload video with real-time progress & speed
   const uploadVideo = async () => {
@@ -230,16 +227,17 @@ const AdminAddCourseForm = ({ onCourseAdded }) => {
       })
 
       addVideoToSection({
-  title: videoTitle.trim(),
-  videoUrl: res.data.videoUrl,
-})
-
+        title: videoTitle.trim(),
+        videoUrl: res.data.videoUrl,
+      })
 
       setVideoFile(null)
       setVideoTitle("")
       setStep(3)
+      toast.success('Video uploaded successfully!')
     } catch (err) {
       setErrorMessage(err.response?.data?.message || "Video upload failed. Please try again.")
+      toast.error('Failed to upload video')
     } finally {
       setUploading(false)
       setUploadProgress(0)
@@ -310,6 +308,7 @@ const AdminAddCourseForm = ({ onCourseAdded }) => {
         navigate("/login")
       }
       setErrorMessage(error.response?.data?.message || "Course creation failed. Please try again.")
+      toast.error('Failed to create course')
     } finally {
       setUploading(false)
     }
@@ -331,72 +330,193 @@ const AdminAddCourseForm = ({ onCourseAdded }) => {
 
   if (step === 1) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <div className="text-center mb-8">
-          <h2 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
-            Create New Course
-          </h2>
-          <p className="text-gray-600 text-lg">Let's start by setting up your course details</p>
-        </div>
-
-        <StepIndicator currentStep={1} totalSteps={4} />
-
-        <div className="bg-white rounded-3xl p-8 shadow-2xl space-y-6">
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700">Course Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
-              placeholder="Enter an engaging course title"
-              disabled={uploading}
-            />
+      <div className="min-h-screen" style={{
+        background: "linear-gradient(135deg, #0B2545 0%, #172A57 50%, #1E3A8A 100%)",
+        fontFamily: "Inter, system-ui, sans-serif",
+        color: "white",
+      }}>
+        <div className="max-w-4xl mx-auto p-6 space-y-8">
+          {/* Header */}
+          <div>
+            <h1 className="text-4xl font-bold" style={{
+              background: "linear-gradient(45deg, #3B82F6, #10B981, #ffffff)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}>
+              Create New Course
+            </h1>
+            <p className="text-[#93C5FD] text-lg mt-2">Add a new course to your learning platform</p>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700">Description</label>
-            <textarea
-              rows={4}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 resize-none"
-              placeholder="Describe what students will learn in this course"
-              disabled={uploading}
-            />
-          </div>
+          {/* Form */}
+          <form onSubmit={handleSubmitCourse} className="space-y-6">
+            <div className="rounded-2xl p-6 space-y-6"
+              style={{
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                backdropFilter: "blur(20px)",
+              }}>
+              {/* Course Details */}
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="title" className="block text-sm font-medium text-[#93C5FD] mb-1">
+                    Course Title
+                  </label>
+                  <input
+                    type="text"
+                    id="title"
+                    name="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter course title"
+                    required
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700">Duration (hours)</label>
-            <input
-              type="number"
-              min="1"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              className="w-full p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
-              placeholder="Estimated course duration"
-              disabled={uploading}
-            />
-          </div>
+                <div>
+                  <label htmlFor="description" className="block text-sm font-medium text-[#93C5FD] mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    id="description"
+                    name="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows="4"
+                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter course description"
+                    required
+                  />
+                </div>
 
-          {errorMessage && (
-            <div className="flex items-center p-4 bg-red-50 border border-red-200 rounded-xl">
-              <AlertCircle className="h-5 w-5 text-red-600 mr-3" />
-              <p className="text-red-700 font-medium">{errorMessage}</p>
+                <div>
+                  <label htmlFor="duration" className="block text-sm font-medium text-[#93C5FD] mb-1">
+                    Duration (hours)
+                  </label>
+                  <input
+                    type="number"
+                    id="duration"
+                    name="duration"
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter duration"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Videos Section */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold text-white">Course Videos</h3>
+                
+                {/* Video List */}
+                {allVideos.length > 0 && (
+                  <div className="space-y-3">
+                    {allVideos.map((video, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 rounded-xl"
+                        style={{
+                          background: "rgba(255, 255, 255, 0.05)",
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                        }}>
+                        <div className="flex items-center space-x-3">
+                          <Video className="h-5 w-5 text-[#93C5FD]" />
+                          <span className="text-white font-medium">{video.title}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeVideo(index)}
+                          className="p-2 rounded-full hover:bg-red-500/20 transition-colors"
+                        >
+                          <X className="h-5 w-5 text-red-500" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Video Upload */}
+                <div className="space-y-4 p-4 rounded-xl"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                  }}>
+                  <div>
+                    <label className="block text-[#93C5FD] text-sm font-medium mb-2">
+                      Video Title
+                    </label>
+                    <input
+                      type="text"
+                      value={videoTitle}
+                      onChange={(e) => setVideoTitle(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter video title"
+                      disabled={uploading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[#93C5FD] text-sm font-medium mb-2">
+                      Video File
+                    </label>
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={onFileChange}
+                      className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={uploading}
+                    />
+                  </div>
+
+                  {uploading && (
+                    <div className="space-y-2">
+                      <div className="h-2 rounded-full overflow-hidden"
+                        style={{
+                          background: "rgba(255, 255, 255, 0.1)",
+                        }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{
+                            width: `${uploadProgress}%`,
+                            background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-sm text-[#93C5FD]">
+                        <span>Speed: {uploadSpeed}</span>
+                        <span>{uploadProgress}%</span>
+                        <span>Time left: {timeLeft}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={uploadVideo}
+                    disabled={uploading || !videoFile || !videoTitle.trim()}
+                    className="w-full py-3 px-4 rounded-xl font-medium transition-all duration-300 hover:scale-105 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                    }}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    {uploading ? "Uploading..." : "Upload Video"}
+                  </button>
+                </div>
+              </div>
             </div>
-          )}
 
-          <button
-            disabled={!canProceedToVideos || uploading}
-            onClick={() => setStep(2)}
-            className={`w-full py-4 rounded-xl text-white font-semibold text-lg transition-all duration-300 transform hover:scale-105 ${
-              canProceedToVideos && !uploading
-                ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
-                : "bg-gray-300 cursor-not-allowed"
-            }`}
-          >
-            Next: Upload Videos
-          </button>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              className="w-full py-4 px-6 rounded-xl font-medium text-lg transition-all duration-300 hover:scale-105 flex items-center justify-center"
+              style={{
+                background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+              }}>
+              <Plus className="h-5 w-5 mr-2" />
+              Create Course
+            </button>
+          </form>
         </div>
       </div>
     )

@@ -1,14 +1,18 @@
-"use client"
+import { useEffect, useRef, useState } from "react";
+import { Play, Award, Users, Star, Box, CheckCircle, ArrowRight, Monitor, Zap, Target, Globe, BookOpen, Clock, Download, Phone, Mail, Facebook, GraduationCap, MapPin, Calendar, Sparkles } from 'lucide-react';
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
-import { useEffect, useRef, useState } from "react"
-import { Play, Award, Users, Star, Box, CheckCircle, ArrowRight, Monitor, Zap, Target, Globe, BookOpen, Clock, Download, Phone, Mail, Facebook, GraduationCap, MapPin, Calendar, Sparkles } from 'lucide-react'
+gsap.registerPlugin(ScrollTrigger);
 
 const EnhancedHomePage = () => {
-  const heroRef = useRef(null)
-  const instructorRef = useRef(null)
-  const featuresRef = useRef(null)
-  const [isVisible, setIsVisible] = useState({})
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  const heroRef = useRef(null);
+  const instructorRef = useRef(null);
+  const workshopRef = useRef(null);
+  const contactRef = useRef(null);
+  const footerRef = useRef(null);
+  const [isVisible, setIsVisible] = useState({});
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     // Mouse tracking for parallax effects
@@ -16,40 +20,128 @@ const EnhancedHomePage = () => {
       setMousePosition({
         x: (e.clientX / window.innerWidth) * 100,
         y: (e.clientY / window.innerHeight) * 100,
-      })
-    }
+      });
+    };
 
-    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mousemove", handleMouseMove);
 
-    // Enhanced intersection observer with stagger animations
+    // GSAP animations for each section
+    gsap.fromTo(
+      heroRef.current,
+      { opacity: 0, y: 100, scale: 0.95 },
+      {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        duration: 1.2,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: heroRef.current,
+          start: "top 80%",
+        },
+      }
+    );
+
+    gsap.fromTo(
+      instructorRef.current,
+      { opacity: 0, y: 50 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 1,
+        ease: "power2.out",
+        scrollTrigger: {
+          trigger: instructorRef.current,
+          start: "top 85%",
+        },
+      }
+    );
+
+    gsap.fromTo(
+      workshopRef.current,
+      { opacity: 0, y: 50 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 1,
+        ease: "power2.out",
+        scrollTrigger: {
+          trigger: workshopRef.current,
+          start: "top 85%",
+        },
+      }
+    );
+
+    gsap.fromTo(
+      contactRef.current,
+      { opacity: 0, y: 50 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 1,
+        ease: "power2.out",
+        scrollTrigger: {
+          trigger: contactRef.current,
+          start: "top 85%",
+        },
+      }
+    );
+
+    gsap.fromTo(
+      footerRef.current,
+      { opacity: 0, y: 30 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 0.8,
+        ease: "power2.out",
+        scrollTrigger: {
+          trigger: footerRef.current,
+          start: "top 90%",
+        },
+      }
+    );
+
+    // Enhanced intersection observer for staggered child animations
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry, index) => {
           if (entry.isIntersecting) {
-            setTimeout(() => {
-              setIsVisible((prev) => ({
-                ...prev,
-                [entry.target.id]: true,
-              }))
-            }, index * 100)
+            gsap.fromTo(
+              entry.target.children,
+              { opacity: 0, y: 30 },
+              {
+                opacity: 1,
+                y: 0,
+                duration: 0.8,
+                stagger: 0.2,
+                ease: "power2.out",
+                delay: index * 0.1,
+              }
+            );
+            setIsVisible((prev) => ({
+              ...prev,
+              [entry.target.id]: true,
+            }));
           }
-        })
+        });
       },
-      { threshold: 0.1 },
-    )
+      { threshold: 0.1 }
+    );
 
-    const elements = document.querySelectorAll("[data-animate]")
-    elements.forEach((el) => observer.observe(el))
+    const elements = document.querySelectorAll("[data-animate]");
+    elements.forEach((el) => observer.observe(el));
 
     return () => {
-      observer.disconnect()
-      window.removeEventListener("mousemove", handleMouseMove)
-    }
-  }, [])
+      observer.disconnect();
+      window.removeEventListener("mousemove", handleMouseMove);
+      ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
+    };
+  }, []);
 
   const scrollToSection = (sectionId) => {
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" })
-  }
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
+  };
 
   return (
     <div
@@ -74,19 +166,19 @@ const EnhancedHomePage = () => {
           zIndex: 0,
         }}
       >
-        {[...Array(20)].map((_, i) => (
+        {[...Array(30)].map((_, i) => (
           <div
             key={i}
             style={{
               position: "absolute",
-              width: `${Math.random() * 4 + 2}px`,
-              height: `${Math.random() * 4 + 2}px`,
-              background: `rgba(${Math.random() > 0.5 ? "59, 130, 246" : "16, 185, 129"}, 0.3)`,
+              width: `${Math.random() * 3 + 2}px`,
+              height: `${Math.random() * 3 + 2}px`,
+              background: `rgba(${Math.random() > 0.5 ? "59, 130, 246" : "16, 185, 129"}, 0.4)`,
               borderRadius: "50%",
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              animation: `float ${Math.random() * 10 + 5}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 5}s`,
+              animation: `float ${Math.random() * 8 + 4}s ease-in-out infinite`,
+              animationDelay: `${Math.random() * 4}s`,
             }}
           />
         ))}
@@ -103,13 +195,12 @@ const EnhancedHomePage = () => {
           background: "rgba(11, 37, 69, 0.95)",
           backdropFilter: "blur(20px)",
           borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-          padding: "1rem 0",
-          transition: "all 0.3s ease",
+          padding: "1.25rem 0",
         }}
       >
         <div
           style={{
-            maxWidth: "1200px",
+            maxWidth: "1280px",
             margin: "0 auto",
             padding: "0 2rem",
             display: "flex",
@@ -121,30 +212,31 @@ const EnhancedHomePage = () => {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "0.75rem",
-              animation: "slideInLeft 0.8s ease-out",
+              gap: "1rem",
             }}
+            data-animate
+            id="nav-logo"
           >
             <div
               style={{
-                width: "2.5rem",
-                height: "2.5rem",
-                borderRadius: "12px",
+                width: "3rem",
+                height: "3rem",
+                borderRadius: "16px",
                 background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                boxShadow: "0 8px 25px rgba(59, 130, 246, 0.3)",
-                animation: "pulse 2s infinite",
+                boxShadow: "0 10px 30px rgba(59, 130, 246, 0.4)",
+                animation: "pulse 2.5s infinite",
               }}
             >
-              <Box size={20} color="white" />
+              <Box size={24} color="white" />
             </div>
             <div>
               <h1
                 style={{
-                  fontSize: "1.5rem",
-                  fontWeight: "700",
+                  fontSize: "1.75rem",
+                  fontWeight: "800",
                   background: "linear-gradient(45deg, #3B82F6, #10B981, #ffffff)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
@@ -155,7 +247,7 @@ const EnhancedHomePage = () => {
               </h1>
               <div
                 style={{
-                  fontSize: "0.75rem",
+                  fontSize: "0.875rem",
                   color: "#93C5FD",
                   fontWeight: "500",
                   letterSpacing: "0.5px",
@@ -171,8 +263,9 @@ const EnhancedHomePage = () => {
               display: "flex",
               alignItems: "center",
               gap: "2rem",
-              animation: "slideInRight 0.8s ease-out",
             }}
+            data-animate
+            id="nav-links"
           >
             <div style={{ display: "flex", gap: "1.5rem" }} className="hidden md:flex">
               {["Workshop", "Instructor", "Contact"].map((item, index) => (
@@ -184,24 +277,54 @@ const EnhancedHomePage = () => {
                     border: "none",
                     color: "#93C5FD",
                     cursor: "pointer",
-                    fontWeight: "500",
-                    padding: "0.5rem 1rem",
-                    borderRadius: "8px",
+                    fontWeight: "600",
+                    fontSize: "1rem",
+                    padding: "0.75rem 1.25rem",
+                    borderRadius: "12px",
                     transition: "all 0.3s ease",
                     position: "relative",
                     overflow: "hidden",
-                    animation: `fadeInDown 0.8s ease-out ${index * 0.1}s both`,
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.background = "rgba(59, 130, 246, 0.1)"
-                    e.target.style.transform = "translateY(-2px)"
+                    gsap.to(e.target, {
+                      y: -4,
+                      background: "rgba(59, 130, 246, 0.15)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.background = "none"
-                    e.target.style.transform = "translateY(0)"
+                    gsap.to(e.target, {
+                      y: 0,
+                      background: "none",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
                   }}
                 >
-                  {item}
+                  <span
+                    style={{
+                      position: "relative",
+                      zIndex: 1,
+                    }}
+                  >
+                    {item}
+                  </span>
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: 0,
+                      left: 0,
+                      width: "100%",
+                      height: "3px",
+                      background: "linear-gradient(90deg, #3B82F6, #10B981)",
+                      transform: "scaleX(0)",
+                      transformOrigin: "left",
+                      transition: "transform 0.3s ease",
+                    }}
+                    onMouseEnter={(e) => (e.target.style.transform = "scaleX(1)")}
+                    onMouseLeave={(e) => (e.target.style.transform = "scaleX(0)")}
+                  />
                 </button>
               ))}
             </div>
@@ -210,23 +333,32 @@ const EnhancedHomePage = () => {
               <a
                 href="/login"
                 style={{
-                  padding: "0.75rem 1.5rem",
+                  padding: "0.75rem 1.75rem",
                   background: "rgba(255, 255, 255, 0.1)",
                   border: "1px solid rgba(255, 255, 255, 0.2)",
                   borderRadius: "12px",
                   color: "white",
                   textDecoration: "none",
-                  fontWeight: "500",
+                  fontWeight: "600",
+                  fontSize: "1rem",
                   transition: "all 0.3s ease",
                   backdropFilter: "blur(10px)",
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.transform = "translateY(-2px)"
-                  e.target.style.boxShadow = "0 8px 25px rgba(255, 255, 255, 0.1)"
+                  gsap.to(e.target, {
+                    y: -4,
+                    boxShadow: "0 10px 30px rgba(255, 255, 255, 0.15)",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.transform = "translateY(0)"
-                  e.target.style.boxShadow = "none"
+                  gsap.to(e.target, {
+                    y: 0,
+                    boxShadow: "none",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
               >
                 Sign In
@@ -234,23 +366,34 @@ const EnhancedHomePage = () => {
               <a
                 href="/register"
                 style={{
-                  padding: "0.75rem 1.5rem",
+                  padding: "0.75rem 1.75rem",
                   background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
                   border: "none",
                   borderRadius: "12px",
                   color: "white",
                   textDecoration: "none",
-                  fontWeight: "600",
+                  fontWeight: "700",
+                  fontSize: "1rem",
                   transition: "all 0.3s ease",
-                  boxShadow: "0 8px 25px rgba(59, 130, 246, 0.3)",
+                  boxShadow: "0 10px 30px rgba(59, 130, 246, 0.4)",
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.transform = "translateY(-2px) scale(1.05)"
-                  e.target.style.boxShadow = "0 12px 35px rgba(59, 130, 246, 0.4)"
+                  gsap.to(e.target, {
+                    y: -4,
+                    scale: 1.05,
+                    boxShadow: "0 15px 40px rgba(59, 130, 246, 0.5)",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.transform = "translateY(0) scale(1)"
-                  e.target.style.boxShadow = "0 8px 25px rgba(59, 130, 246, 0.3)"
+                  gsap.to(e.target, {
+                    y: 0,
+                    scale: 1,
+                    boxShadow: "0 10px 30px rgba(59, 130, 246, 0.4)",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
               >
                 Join Workshop
@@ -270,11 +413,15 @@ const EnhancedHomePage = () => {
           padding: "8rem 2rem 4rem",
           position: "relative",
           zIndex: 1,
+          background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+          boxShadow: "0 25px 50px rgba(0, 0, 0, 0.3)",
+          overflow: "hidden",
         }}
       >
+        <div className="absolute inset-0 bg-black/10" />
         <div
           style={{
-            maxWidth: "1200px",
+            maxWidth: "1280px",
             margin: "0 auto",
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
@@ -282,39 +429,33 @@ const EnhancedHomePage = () => {
             alignItems: "center",
           }}
           className="grid-cols-1 lg:grid-cols-2"
+          data-animate
+          id="hero-content"
         >
-          <div
-            data-animate
-            id="hero-content"
-            style={{
-              opacity: isVisible["hero-content"] ? 1 : 0,
-              transform: isVisible["hero-content"] ? "translateX(0)" : "translateX(-100px)",
-              transition: "all 1.2s cubic-bezier(0.4, 0, 0.2, 1)",
-            }}
-          >
+          <div>
             <div
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.75rem",
-                background: "rgba(59, 130, 246, 0.15)",
-                border: "1px solid rgba(59, 130, 246, 0.3)",
+                background: "rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgba(255, 255, 255, 0.3)",
                 borderRadius: "2rem",
                 padding: "0.75rem 1.5rem",
                 marginBottom: "2rem",
                 backdropFilter: "blur(10px)",
-                animation: "glow 2s ease-in-out infinite alternate",
+                animation: "pulse 2s infinite",
               }}
             >
-              <Sparkles size={18} color="#3B82F6" />
-              <span style={{ fontSize: "0.875rem", color: "#93C5FD", fontWeight: "600" }}>
+              <Sparkles size={18} color="white" />
+              <span style={{ fontSize: "0.875rem", color: "white", fontWeight: "600" }}>
                 🎉 First Website Launch & Workshop
               </span>
             </div>
 
             <h1
               style={{
-                fontSize: "4rem",
+                fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
                 fontWeight: "900",
                 lineHeight: "1.1",
                 marginBottom: "2rem",
@@ -328,10 +469,9 @@ const EnhancedHomePage = () => {
               <span
                 style={{
                   display: "block",
-                  background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                  background: "linear-gradient(135deg, #ffffff 0%, #10B981 100%)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
-                  animation: "bounce 2s infinite",
                 }}
               >
                 SketchUp & Lumion
@@ -341,15 +481,14 @@ const EnhancedHomePage = () => {
             <p
               style={{
                 fontSize: "1.25rem",
-                color: "#93C5FD",
+                color: "#d1fae5",
                 lineHeight: "1.7",
                 marginBottom: "3rem",
-                animation: "fadeInUp 1s ease-out 0.5s both",
               }}
             >
               🎓 Join our inaugural 40-hour workshop and master professional 3D modeling and photorealistic rendering.
               <br />
-              <strong style={{ color: "#10B981" }}>First 3 days absolutely FREE!</strong>
+              <strong style={{ color: "#ffffff" }}>First 3 days absolutely FREE!</strong>
             </p>
 
             <div
@@ -357,7 +496,6 @@ const EnhancedHomePage = () => {
                 display: "flex",
                 gap: "1.5rem",
                 marginBottom: "4rem",
-                animation: "fadeInUp 1s ease-out 0.7s both",
               }}
             >
               <a
@@ -373,18 +511,27 @@ const EnhancedHomePage = () => {
                   textDecoration: "none",
                   fontWeight: "700",
                   fontSize: "1.125rem",
-                  transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-                  boxShadow: "0 8px 30px rgba(59, 130, 246, 0.4)",
+                  boxShadow: "0 10px 30px rgba(59, 130, 246, 0.4)",
                   position: "relative",
                   overflow: "hidden",
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.transform = "translateY(-4px) scale(1.05)"
-                  e.target.style.boxShadow = "0 15px 40px rgba(59, 130, 246, 0.5)"
+                  gsap.to(e.target, {
+                    y: -4,
+                    scale: 1.05,
+                    boxShadow: "0 15px 40px rgba(59, 130, 246, 0.5)",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.transform = "translateY(0) scale(1)"
-                  e.target.style.boxShadow = "0 8px 30px rgba(59, 130, 246, 0.4)"
+                  gsap.to(e.target, {
+                    y: 0,
+                    scale: 1,
+                    boxShadow: "0 10px 30px rgba(59, 130, 246, 0.4)",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
               >
                 <Zap size={20} />
@@ -398,23 +545,30 @@ const EnhancedHomePage = () => {
                   alignItems: "center",
                   gap: "0.75rem",
                   padding: "1.25rem 2rem",
-                  background: "rgba(255, 255, 255, 0.1)",
-                  border: "2px solid rgba(255, 255, 255, 0.2)",
+                  background: "rgba(255, 255, 255, 0.15)",
+                  border: "2px solid rgba(255, 255, 255, 0.3)",
                   borderRadius: "16px",
                   color: "white",
                   fontWeight: "600",
                   fontSize: "1.125rem",
                   cursor: "pointer",
-                  transition: "all 0.4s ease",
                   backdropFilter: "blur(10px)",
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.background = "rgba(255, 255, 255, 0.2)"
-                  e.target.style.transform = "translateY(-2px)"
+                  gsap.to(e.target, {
+                    background: "rgba(255, 255, 255, 0.25)",
+                    y: -4,
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.background = "rgba(255, 255, 255, 0.1)"
-                  e.target.style.transform = "translateY(0)"
+                  gsap.to(e.target, {
+                    background: "rgba(255, 255, 255, 0.15)",
+                    y: 0,
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
               >
                 <Play size={20} />
@@ -427,8 +581,8 @@ const EnhancedHomePage = () => {
                 display: "grid",
                 gridTemplateColumns: "repeat(3, 1fr)",
                 gap: "2rem",
-                animation: "fadeInUp 1s ease-out 0.9s both",
               }}
+              className="grid-cols-1 sm:grid-cols-3"
             >
               {[
                 { number: "40", label: "Hours", color: "#10B981" },
@@ -440,20 +594,27 @@ const EnhancedHomePage = () => {
                   style={{
                     textAlign: "center",
                     padding: "1.5rem",
-                    background: "rgba(255, 255, 255, 0.05)",
+                    background: "rgba(255, 255, 255, 0.08)",
                     borderRadius: "16px",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
                     backdropFilter: "blur(10px)",
                     transition: "all 0.3s ease",
-                    animation: `slideInUp 0.8s ease-out ${index * 0.2}s both`,
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.transform = "translateY(-5px)"
-                    e.target.style.background = "rgba(255, 255, 255, 0.1)"
+                    gsap.to(e.target, {
+                      y: -5,
+                      background: "rgba(255, 255, 255, 0.12)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.transform = "translateY(0)"
-                    e.target.style.background = "rgba(255, 255, 255, 0.05)"
+                    gsap.to(e.target, {
+                      y: 0,
+                      background: "rgba(255, 255, 255, 0.08)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
                   }}
                 >
                   <div
@@ -469,7 +630,7 @@ const EnhancedHomePage = () => {
                   <div
                     style={{
                       fontSize: "0.875rem",
-                      color: "#93C5FD",
+                      color: "#d1fae5",
                       fontWeight: "500",
                     }}
                   >
@@ -481,117 +642,134 @@ const EnhancedHomePage = () => {
           </div>
 
           <div
-            data-animate
-            id="hero-visual"
             style={{
-              opacity: isVisible["hero-visual"] ? 1 : 0,
-              transform: isVisible["hero-visual"] ? "translateX(0)" : "translateX(100px)",
-              transition: "all 1.2s cubic-bezier(0.4, 0, 0.2, 1) 0.3s",
+              position: "relative",
+              background: "rgba(255, 255, 255, 0.08)",
+              borderRadius: "24px",
+              padding: "3rem",
+              border: "1px solid rgba(255, 255, 255, 0.15)",
+              backdropFilter: "blur(20px)",
+              boxShadow: "0 25px 50px rgba(0, 0, 0, 0.3)",
+              transform: `perspective(1000px) rotateY(${(mousePosition.x - 50) * 0.1}deg) rotateX(${(mousePosition.y - 50) * 0.05}deg)`,
+              transition: "transform 0.1s ease-out",
             }}
           >
             <div
               style={{
-                position: "relative",
-                background: "rgba(255, 255, 255, 0.08)",
-                borderRadius: "24px",
-                padding: "3rem",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                backdropFilter: "blur(20px)",
-                boxShadow: "0 25px 50px rgba(0, 0, 0, 0.3)",
-                transform: `perspective(1000px) rotateY(${(mousePosition.x - 50) * 0.1}deg) rotateX(${(mousePosition.y - 50) * 0.05}deg)`,
-                transition: "transform 0.1s ease-out",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "2rem",
+                marginBottom: "2rem",
               }}
+              className="grid-cols-1 sm:grid-cols-2"
             >
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "2rem",
-                  marginBottom: "2rem",
+                  background: "linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)",
+                  borderRadius: "16px",
+                  padding: "2rem",
+                  textAlign: "center",
+                  transition: "all 0.3s ease",
+                }}
+                onMouseEnter={(e) => {
+                  gsap.to(e.target, {
+                    scale: 1.05,
+                    rotateZ: 2,
+                    boxShadow: "0 15px 30px rgba(59, 130, 246, 0.4)",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
+                }}
+                onMouseLeave={(e) => {
+                  gsap.to(e.target, {
+                    scale: 1,
+                    rotateZ: 0,
+                    boxShadow: "none",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
               >
-                <div
-                  style={{
-                    background: "linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)",
-                    borderRadius: "16px",
-                    padding: "2rem",
-                    textAlign: "center",
-                    transition: "all 0.3s ease",
-                    animation: "float 6s ease-in-out infinite",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.transform = "scale(1.05) rotateZ(2deg)"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = "scale(1) rotateZ(0deg)"
-                  }}
-                >
-                  <Monitor size={40} style={{ margin: "0 auto 1rem", animation: "bounce 2s infinite" }} />
-                  <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "0.5rem" }}>SketchUp Pro</h3>
-                  <p style={{ fontSize: "0.875rem", opacity: 0.9 }}>3D Modeling Mastery</p>
-                </div>
-
-                <div
-                  style={{
-                    background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                    borderRadius: "16px",
-                    padding: "2rem",
-                    textAlign: "center",
-                    transition: "all 0.3s ease",
-                    animation: "float 6s ease-in-out infinite 3s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.transform = "scale(1.05) rotateZ(-2deg)"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = "scale(1) rotateZ(0deg)"
-                  }}
-                >
-                  <Globe size={40} style={{ margin: "0 auto 1rem", animation: "spin 8s linear infinite" }} />
-                  <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "0.5rem" }}>Lumion</h3>
-                  <p style={{ fontSize: "0.875rem", opacity: 0.9 }}>Photorealistic Rendering</p>
-                </div>
+                <Monitor size={40} style={{ margin: "0 auto 1rem", animation: "bounce 2s infinite" }} color="white" />
+                <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "0.5rem", color: "white" }}>
+                  SketchUp Pro
+                </h3>
+                <p style={{ fontSize: "0.875rem", color: "#d1fae5" }}>3D Modeling Mastery</p>
               </div>
 
               <div
                 style={{
-                  background: "rgba(255, 255, 255, 0.08)",
+                  background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
                   borderRadius: "16px",
-                  padding: "1.5rem",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  padding: "2rem",
+                  textAlign: "center",
+                  transition: "all 0.3s ease",
+                }}
+                onMouseEnter={(e) => {
+                  gsap.to(e.target, {
+                    scale: 1.05,
+                    rotateZ: -2,
+                    boxShadow: "0 15px 30px rgba(16, 185, 129, 0.4)",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
+                }}
+                onMouseLeave={(e) => {
+                  gsap.to(e.target, {
+                    scale: 1,
+                    rotateZ: 0,
+                    boxShadow: "none",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
+                }}
+              >
+                <Globe size={40} style={{ margin: "0 auto 1rem", animation: "spin 8s linear infinite" }} color="white" />
+                <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "0.5rem", color: "white" }}>
+                  Lumion
+                </h3>
+                <p style={{ fontSize: "0.875rem", color: "#d1fae5" }}>Photorealistic Rendering</p>
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: "rgba(255, 255, 255, 0.08)",
+                borderRadius: "16px",
+                padding: "1.5rem",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "1rem",
+                }}
+              >
+                <span style={{ fontSize: "0.875rem", color: "#d1fae5" }}>Workshop Progress</span>
+                <span style={{ fontSize: "0.875rem", fontWeight: "600", color: "white" }}>Starting Soon!</span>
+              </div>
+              <div
+                style={{
+                  width: "100%",
+                  height: "12px",
+                  background: "rgba(255, 255, 255, 0.1)",
+                  borderRadius: "6px",
+                  overflow: "hidden",
+                  position: "relative",
                 }}
               >
                 <div
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "1rem",
-                  }}
-                >
-                  <span style={{ fontSize: "0.875rem", color: "#93C5FD" }}>Workshop Progress</span>
-                  <span style={{ fontSize: "0.875rem", fontWeight: "600" }}>Starting Soon!</span>
-                </div>
-                <div
-                  style={{
                     width: "100%",
-                    height: "12px",
-                    background: "rgba(255, 255, 255, 0.1)",
+                    height: "100%",
+                    background: "linear-gradient(90deg, #3B82F6 0%, #10B981 100%)",
                     borderRadius: "6px",
-                    overflow: "hidden",
-                    position: "relative",
+                    animation: "shimmer 2s ease-in-out infinite",
                   }}
-                >
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      background: "linear-gradient(90deg, #3B82F6 0%, #10B981 100%)",
-                      borderRadius: "6px",
-                      animation: "shimmer 2s ease-in-out infinite",
-                    }}
-                  />
-                </div>
+                />
               </div>
             </div>
           </div>
@@ -611,7 +789,7 @@ const EnhancedHomePage = () => {
       >
         <div
           style={{
-            maxWidth: "1200px",
+            maxWidth: "1280px",
             margin: "0 auto",
           }}
         >
@@ -621,9 +799,6 @@ const EnhancedHomePage = () => {
             style={{
               textAlign: "center",
               marginBottom: "4rem",
-              opacity: isVisible["instructor-header"] ? 1 : 0,
-              transform: isVisible["instructor-header"] ? "translateY(0)" : "translateY(50px)",
-              transition: "all 1s ease-out",
             }}
           >
             <h2
@@ -641,7 +816,7 @@ const EnhancedHomePage = () => {
             <p
               style={{
                 fontSize: "1.25rem",
-                color: "#93C5FD",
+                color: "#d1fae5",
                 maxWidth: "600px",
                 margin: "0 auto",
               }}
@@ -663,9 +838,7 @@ const EnhancedHomePage = () => {
               padding: "3rem",
               border: "1px solid rgba(255, 255, 255, 0.15)",
               backdropFilter: "blur(20px)",
-              opacity: isVisible["instructor-card"] ? 1 : 0,
-              transform: isVisible["instructor-card"] ? "scale(1)" : "scale(0.9)",
-              transition: "all 1.2s cubic-bezier(0.4, 0, 0.2, 1) 0.3s",
+              boxShadow: "0 25px 50px rgba(0, 0, 0, 0.3)",
             }}
             className="grid-cols-1 lg:grid-cols-2"
           >
@@ -680,10 +853,26 @@ const EnhancedHomePage = () => {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "0 20px 40px rgba(59, 130, 246, 0.3)",
+                  boxShadow: "0 20px 40px rgba(59, 130, 246, 0.4)",
                   animation: "pulse 3s infinite",
                   position: "relative",
                   overflow: "hidden",
+                }}
+                onMouseEnter={(e) => {
+                  gsap.to(e.target, {
+                    scale: 1.05,
+                    boxShadow: "0 25px 50px rgba(59, 130, 246, 0.5)",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
+                }}
+                onMouseLeave={(e) => {
+                  gsap.to(e.target, {
+                    scale: 1,
+                    boxShadow: "0 20px 40px rgba(59, 130, 246, 0.4)",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
               >
                 <GraduationCap size={80} color="white" />
@@ -694,7 +883,7 @@ const EnhancedHomePage = () => {
                     left: "-50%",
                     width: "200%",
                     height: "200%",
-                    background: "linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent)",
+                    background: "linear-gradient(45deg, transparent, rgba(255,255,255,0.2), transparent)",
                     animation: "shine 3s infinite",
                   }}
                 />
@@ -707,10 +896,12 @@ const EnhancedHomePage = () => {
                   border: "1px solid rgba(255, 255, 255, 0.1)",
                 }}
               >
-                <div style={{ fontSize: "0.875rem", color: "#93C5FD", marginBottom: "0.5rem" }}>
+                <div style={{ fontSize: "0.875rem", color: "#d1fae5", marginBottom: "0.5rem" }}>
                   Professional Photo Coming Soon
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "#64748b" }}>High-quality instructor photo will be added</div>
+                <div style={{ fontSize: "0.75rem", color: "#64748b" }}>
+                  High-quality instructor photo will be added
+                </div>
               </div>
             </div>
 
@@ -746,9 +937,27 @@ const EnhancedHomePage = () => {
                     borderRadius: "12px",
                     border: "1px solid rgba(59, 130, 246, 0.3)",
                   }}
+                  onMouseEnter={(e) => {
+                    gsap.to(e.target, {
+                      scale: 1.05,
+                      background: "rgba(59, 130, 246, 0.2)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
+                  }}
+                  onMouseLeave={(e) => {
+                    gsap.to(e.target, {
+                      scale: 1,
+                      background: "rgba(59, 130, 246, 0.1)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
+                  }}
                 >
                   <GraduationCap size={16} color="#3B82F6" />
-                  <span style={{ fontSize: "0.875rem", color: "#93C5FD" }}>HND Civil Engineering</span>
+                  <span style={{ fontSize: "0.875rem", color: "#d1fae5" }}>
+                    HND Civil Engineering
+                  </span>
                 </div>
                 <div
                   style={{
@@ -760,9 +969,27 @@ const EnhancedHomePage = () => {
                     borderRadius: "12px",
                     border: "1px solid rgba(16, 185, 129, 0.3)",
                   }}
+                  onMouseEnter={(e) => {
+                    gsap.to(e.target, {
+                      scale: 1.05,
+                      background: "rgba(16, 185, 129, 0.2)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
+                  }}
+                  onMouseLeave={(e) => {
+                    gsap.to(e.target, {
+                      scale: 1,
+                      background: "rgba(16, 185, 129, 0.1)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
+                  }}
                 >
                   <MapPin size={16} color="#10B981" />
-                  <span style={{ fontSize: "0.875rem", color: "#93C5FD" }}>BCAS Jaffna</span>
+                  <span style={{ fontSize: "0.875rem", color: "#d1fae5" }}>
+                    BCAS Jaffna
+                  </span>
                 </div>
               </div>
 
@@ -794,11 +1021,11 @@ const EnhancedHomePage = () => {
                   }}
                 >
                   <BookOpen size={20} color="#3B82F6" />
-                  <span style={{ fontSize: "1.125rem", fontWeight: "500" }}>
+                  <span style={{ fontSize: "1.125rem", fontWeight: "500", color: "white" }}>
                     BSc Civil Engineering - ICBT Colombo
                   </span>
                 </div>
-                <p style={{ color: "#93C5FD", lineHeight: "1.6" }}>
+                <p style={{ color: "#d1fae5", lineHeight: "1.6" }}>
                   Currently pursuing advanced studies in Civil Engineering, bringing fresh academic knowledge combined
                   with practical 3D visualization skills to help students master SketchUp and Lumion.
                 </p>
@@ -810,6 +1037,7 @@ const EnhancedHomePage = () => {
                   gridTemplateColumns: "repeat(2, 1fr)",
                   gap: "1rem",
                 }}
+                className="grid-cols-1 sm:grid-cols-2"
               >
                 <div
                   style={{
@@ -819,10 +1047,30 @@ const EnhancedHomePage = () => {
                     border: "1px solid rgba(59, 130, 246, 0.3)",
                     textAlign: "center",
                   }}
+                  onMouseEnter={(e) => {
+                    gsap.to(e.target, {
+                      scale: 1.05,
+                      background: "rgba(59, 130, 246, 0.2)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
+                  }}
+                  onMouseLeave={(e) => {
+                    gsap.to(e.target, {
+                      scale: 1,
+                      background: "rgba(59, 130, 246, 0.1)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
+                  }}
                 >
                   <Target size={24} style={{ margin: "0 auto 0.5rem", color: "#3B82F6" }} />
-                  <div style={{ fontSize: "0.875rem", color: "#93C5FD" }}>Specialized in</div>
-                  <div style={{ fontWeight: "600", color: "white" }}>3D Visualization</div>
+                  <div style={{ fontSize: "0.875rem", color: "#d1fae5" }}>
+                    Specialized in
+                  </div>
+                  <div style={{ fontWeight: "600", color: "white" }}>
+                    3D Visualization
+                  </div>
                 </div>
                 <div
                   style={{
@@ -832,10 +1080,30 @@ const EnhancedHomePage = () => {
                     border: "1px solid rgba(16, 185, 129, 0.3)",
                     textAlign: "center",
                   }}
+                  onMouseEnter={(e) => {
+                    gsap.to(e.target, {
+                      scale: 1.05,
+                      background: "rgba(16, 185, 129, 0.2)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
+                  }}
+                  onMouseLeave={(e) => {
+                    gsap.to(e.target, {
+                      scale: 1,
+                      background: "rgba(16, 185, 129, 0.1)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
+                  }}
                 >
                   <Award size={24} style={{ margin: "0 auto 0.5rem", color: "#10B981" }} />
-                  <div style={{ fontSize: "0.875rem", color: "#93C5FD" }}>Expert in</div>
-                  <div style={{ fontWeight: "600", color: "white" }}>Technical Drawing</div>
+                  <div style={{ fontSize: "0.875rem", color: "#d1fae5" }}>
+                    Expert in
+                  </div>
+                  <div style={{ fontWeight: "600", color: "white" }}>
+                    Technical Drawing
+                  </div>
                 </div>
               </div>
             </div>
@@ -846,6 +1114,7 @@ const EnhancedHomePage = () => {
       {/* Workshop Details Section */}
       <section
         id="workshop"
+        ref={workshopRef}
         style={{
           padding: "6rem 2rem",
           background: "rgba(0, 0, 0, 0.2)",
@@ -855,7 +1124,7 @@ const EnhancedHomePage = () => {
       >
         <div
           style={{
-            maxWidth: "1200px",
+            maxWidth: "1280px",
             margin: "0 auto",
           }}
         >
@@ -875,7 +1144,7 @@ const EnhancedHomePage = () => {
             <p
               style={{
                 fontSize: "1.25rem",
-                color: "#93C5FD",
+                color: "#d1fae5",
                 maxWidth: "800px",
                 margin: "0 auto",
               }}
@@ -901,11 +1170,9 @@ const EnhancedHomePage = () => {
                 padding: "3rem",
                 border: "1px solid rgba(255, 255, 255, 0.15)",
                 backdropFilter: "blur(20px)",
-                opacity: isVisible["workshop-card"] ? 1 : 0,
-                transform: isVisible["workshop-card"] ? "translateY(0)" : "translateY(50px)",
-                transition: "all 1s ease-out",
                 position: "relative",
                 overflow: "hidden",
+                boxShadow: "0 25px 50px rgba(0, 0, 0, 0.3)",
               }}
             >
               <div
@@ -948,7 +1215,7 @@ const EnhancedHomePage = () => {
 
               <p
                 style={{
-                  color: "#93C5FD",
+                  color: "#d1fae5",
                   marginBottom: "2rem",
                   lineHeight: "1.7",
                   fontSize: "1.125rem",
@@ -965,6 +1232,7 @@ const EnhancedHomePage = () => {
                   gap: "1rem",
                   marginBottom: "2rem",
                 }}
+                className="grid-cols-1 sm:grid-cols-2"
               >
                 <div
                   style={{
@@ -976,11 +1244,31 @@ const EnhancedHomePage = () => {
                     borderRadius: "12px",
                     border: "1px solid rgba(59, 130, 246, 0.3)",
                   }}
+                  onMouseEnter={(e) => {
+                    gsap.to(e.target, {
+                      scale: 1.05,
+                      background: "rgba(59, 130, 246, 0.2)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
+                  }}
+                  onMouseLeave={(e) => {
+                    gsap.to(e.target, {
+                      scale: 1,
+                      background: "rgba(59, 130, 246, 0.1)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
+                  }}
                 >
                   <Clock size={20} color="#3B82F6" />
                   <div>
-                    <div style={{ fontSize: "0.875rem", color: "#93C5FD" }}>Duration</div>
-                    <div style={{ fontWeight: "600", color: "white" }}>40 Hours</div>
+                    <div style={{ fontSize: "0.875rem", color: "#d1fae5" }}>
+                      Duration
+                    </div>
+                    <div style={{ fontWeight: "600", color: "white" }}>
+                      40 Hours
+                    </div>
                   </div>
                 </div>
                 <div
@@ -993,11 +1281,31 @@ const EnhancedHomePage = () => {
                     borderRadius: "12px",
                     border: "1px solid rgba(16, 185, 129, 0.3)",
                   }}
+                  onMouseEnter={(e) => {
+                    gsap.to(e.target, {
+                      scale: 1.05,
+                      background: "rgba(16, 185, 129, 0.2)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
+                  }}
+                  onMouseLeave={(e) => {
+                    gsap.to(e.target, {
+                      scale: 1,
+                      background: "rgba(16, 185, 129, 0.1)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
+                  }}
                 >
                   <Award size={20} color="#10B981" />
                   <div>
-                    <div style={{ fontSize: "0.875rem", color: "#93C5FD" }}>Certificate</div>
-                    <div style={{ fontWeight: "600", color: "white" }}>Included</div>
+                    <div style={{ fontSize: "0.875rem", color: "#d1fae5" }}>
+                      Certificate
+                    </div>
+                    <div style={{ fontWeight: "600", color: "white" }}>
+                      Included
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1031,12 +1339,20 @@ const EnhancedHomePage = () => {
                       transition: "all 0.3s ease",
                     }}
                     onMouseEnter={(e) => {
-                      e.target.style.background = "rgba(255, 255, 255, 0.05)"
-                      e.target.style.transform = "translateX(10px)"
+                      gsap.to(e.target, {
+                        x: 10,
+                        background: "rgba(255, 255, 255, 0.05)",
+                        duration: 0.3,
+                        ease: "power2.out",
+                      });
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.background = "transparent"
-                      e.target.style.transform = "translateX(0)"
+                      gsap.to(e.target, {
+                        x: 0,
+                        background: "transparent",
+                        duration: 0.3,
+                        ease: "power2.out",
+                      });
                     }}
                   >
                     <CheckCircle size={16} color="#10B981" />
@@ -1058,16 +1374,25 @@ const EnhancedHomePage = () => {
                     fontWeight: "600",
                     textDecoration: "none",
                     textAlign: "center",
-                    transition: "all 0.3s ease",
-                    boxShadow: "0 8px 25px rgba(59, 130, 246, 0.3)",
+                    boxShadow: "0 10px 30px rgba(59, 130, 246, 0.4)",
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.transform = "translateY(-2px)"
-                    e.target.style.boxShadow = "0 12px 35px rgba(59, 130, 246, 0.4)"
+                    gsap.to(e.target, {
+                      y: -4,
+                      scale: 1.05,
+                      boxShadow: "0 15px 40px rgba(59, 130, 246, 0.5)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.transform = "translateY(0)"
-                    e.target.style.boxShadow = "0 8px 25px rgba(59, 130, 246, 0.3)"
+                    gsap.to(e.target, {
+                      y: 0,
+                      scale: 1,
+                      boxShadow: "0 10px 30px rgba(59, 130, 246, 0.4)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
                   }}
                 >
                   Enroll Now
@@ -1087,12 +1412,20 @@ const EnhancedHomePage = () => {
                     transition: "all 0.3s ease",
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.background = "rgba(37, 211, 102, 0.3)"
-                    e.target.style.transform = "translateY(-2px)"
+                    gsap.to(e.target, {
+                      y: -4,
+                      background: "rgba(37, 211, 102, 0.3)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.background = "rgba(37, 211, 102, 0.2)"
-                    e.target.style.transform = "translateY(0)"
+                    gsap.to(e.target, {
+                      y: 0,
+                      background: "rgba(37, 211, 102, 0.2)",
+                      duration: 0.3,
+                      ease: "power2.out",
+                    });
                   }}
                 >
                   💬 Join Group
@@ -1106,6 +1439,7 @@ const EnhancedHomePage = () => {
       {/* Contact Section */}
       <section
         id="contact"
+        ref={contactRef}
         style={{
           padding: "6rem 2rem",
           background: "rgba(0, 0, 0, 0.3)",
@@ -1115,7 +1449,7 @@ const EnhancedHomePage = () => {
       >
         <div
           style={{
-            maxWidth: "1200px",
+            maxWidth: "1280px",
             margin: "0 auto",
             textAlign: "center",
           }}
@@ -1140,6 +1474,8 @@ const EnhancedHomePage = () => {
               gap: "2rem",
               marginBottom: "3rem",
             }}
+            data-animate
+            id="contact-cards"
           >
             {[
               {
@@ -1176,18 +1512,26 @@ const EnhancedHomePage = () => {
                   backdropFilter: "blur(20px)",
                   textDecoration: "none",
                   color: "white",
-                  transition: "all 0.4s ease",
-                  animation: `slideInUp 0.8s ease-out ${index * 0.2}s both`,
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.transform = "translateY(-10px) scale(1.02)"
-                  e.target.style.background = "rgba(255, 255, 255, 0.12)"
-                  e.target.style.boxShadow = `0 20px 40px rgba(${contact.color === "#3B82F6" ? "59, 130, 246" : contact.color === "#25D366" ? "37, 211, 102" : "24, 119, 242"}, 0.3)`
+                  gsap.to(e.target, {
+                    y: -10,
+                    scale: 1.02,
+                    background: "rgba(255, 255, 255, 0.12)",
+                    boxShadow: `0 20px 40px rgba(${contact.color === "#3B82F6" ? "59, 130, 246" : contact.color === "#25D366" ? "37, 211, 102" : "24, 119, 242"}, 0.4)`,
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.transform = "translateY(0) scale(1)"
-                  e.target.style.background = "rgba(255, 255, 255, 0.08)"
-                  e.target.style.boxShadow = "none"
+                  gsap.to(e.target, {
+                    y: 0,
+                    scale: 1,
+                    background: "rgba(255, 255, 255, 0.08)",
+                    boxShadow: "none",
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
               >
                 <contact.icon
@@ -1195,8 +1539,10 @@ const EnhancedHomePage = () => {
                   color={contact.color}
                   style={{ margin: "0 auto 1rem", display: "block" }}
                 />
-                <h3 style={{ fontSize: "1.25rem", fontWeight: "600", marginBottom: "0.5rem" }}>{contact.title}</h3>
-                <p style={{ color: "#93C5FD", fontSize: "1rem" }}>{contact.value}</p>
+                <h3 style={{ fontSize: "1.25rem", fontWeight: "600", marginBottom: "0.5rem" }}>
+                  {contact.title}
+                </h3>
+                <p style={{ fontSize: "1rem", color: "#d1fae5" }}>{contact.value}</p>
               </a>
             ))}
           </div>
@@ -1210,7 +1556,7 @@ const EnhancedHomePage = () => {
               backdropFilter: "blur(10px)",
             }}
           >
-            <p style={{ fontSize: "1.125rem", color: "#93C5FD", marginBottom: "1rem" }}>
+            <p style={{ fontSize: "1.125rem", color: "#d1fae5", marginBottom: "1rem" }}>
               📲 For any questions or further details, feel free to contact us on WhatsApp: 0742145537
             </p>
             <p style={{ fontSize: "1rem", color: "#64748b" }}>
@@ -1222,6 +1568,7 @@ const EnhancedHomePage = () => {
 
       {/* Footer */}
       <footer
+        ref={footerRef}
         style={{
           padding: "4rem 2rem 2rem",
           background: "rgba(0, 0, 0, 0.5)",
@@ -1232,10 +1579,12 @@ const EnhancedHomePage = () => {
       >
         <div
           style={{
-            maxWidth: "1200px",
+            maxWidth: "1280px",
             margin: "0 auto",
             textAlign: "center",
           }}
+          data-animate
+          id="footer-content"
         >
           <div
             style={{
@@ -1273,13 +1622,15 @@ const EnhancedHomePage = () => {
               >
                 MODUNO
               </h1>
-              <div style={{ fontSize: "0.875rem", color: "#93C5FD" }}>First Launch 🚀</div>
+              <div style={{ fontSize: "0.875rem", color: "#d1fae5" }}>
+                First Launch 🚀
+              </div>
             </div>
           </div>
 
           <p
             style={{
-              color: "#93C5FD",
+              color: "#d1fae5",
               marginBottom: "2rem",
               fontSize: "1.125rem",
             }}
@@ -1301,20 +1652,29 @@ const EnhancedHomePage = () => {
                 key={index}
                 href="#"
                 style={{
-                  color: "#93C5FD",
+                  color: "#d1fae5",
                   textDecoration: "none",
                   fontWeight: "500",
-                  transition: "all 0.3s ease",
                   padding: "0.5rem 1rem",
                   borderRadius: "8px",
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.color = "#3B82F6"
-                  e.target.style.background = "rgba(59, 130, 246, 0.1)"
+                  gsap.to(e.target, {
+                    color: "#3B82F6",
+                    background: "rgba(59, 130, 246, 0.15)",
+                    y: -2,
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.color = "#93C5FD"
-                  e.target.style.background = "transparent"
+                  gsap.to(e.target, {
+                    color: "#d1fae5",
+                    background: "transparent",
+                    y: 0,
+                    duration: 0.3,
+                    ease: "power2.out",
+                  });
                 }}
               >
                 {link}
@@ -1335,7 +1695,7 @@ const EnhancedHomePage = () => {
           <p
             style={{
               fontSize: "0.875rem",
-              color: "#93C5FD",
+              color: "#d1fae5",
               fontStyle: "italic",
             }}
           >
@@ -1373,45 +1733,15 @@ const EnhancedHomePage = () => {
           100% { transform: translateX(100%); }
         }
         
-        @keyframes glow {
-          0% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
-          100% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.6); }
+        @keyframes shine {
+          0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+          100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
         }
         
         @keyframes textShine {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
-        }
-        
-        @keyframes slideInLeft {
-          from { opacity: 0; transform: translateX(-100px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        
-        @keyframes slideInRight {
-          from { opacity: 0; transform: translateX(100px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        
-        @keyframes fadeInDown {
-          from { opacity: 0; transform: translateY(-30px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes slideInUp {
-          from { opacity: 0; transform: translateY(50px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes shine {
-          0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
-          100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
         }
         
         @media (max-width: 768px) {
@@ -1421,7 +1751,7 @@ const EnhancedHomePage = () => {
         }
       `}</style>
     </div>
-  )
-}
+  );
+};
 
-export default EnhancedHomePage
+export default EnhancedHomePage;

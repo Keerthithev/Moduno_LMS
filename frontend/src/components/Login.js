@@ -4,8 +4,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, AlertCircle, Loader2, Box, Zap, Sparkles, Play, Award, Users, Star, CheckCircle, ArrowRight, Monitor, Target, Globe, BookOpen, Clock, GraduationCap, MapPin } from 'lucide-react';
 import axios from 'axios';
 import { GoogleLogin } from '@react-oauth/google';
+import { useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
+import axiosInstance from '../utils/axiosConfig';
 
 const Login = () => {
+  const { login } = useContext(AuthContext);
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -88,27 +92,40 @@ const Login = () => {
     setLoading(true);
     
     try {
-      const res = await axios.post('http://localhost:1111/api/v1/login', formData);
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
+      const res = await axiosInstance.post('/login', formData);
+      login(res.data.token, res.data.user);
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleLoginSuccess = async (credentialResponse) => {
     setLoading(true);
+    setError('');
+    
     try {
-      const res = await axios.post('http://localhost:1111/api/v1/google-login', {
-        token: credentialResponse.credential,
-      });
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
-      navigate('/dashboard');
+      const res = await axiosInstance.post('/google-login', 
+        { token: credentialResponse.credential }
+      );
+
+      if (res.data && res.data.token && res.data.user) {
+        login(res.data.token, res.data.user);
+        navigate('/dashboard');
+      } else {
+        setError('Invalid response from server');
+      }
     } catch (err) {
-      setError('Google authentication failed. Please try another method.');
+      console.error('Google auth error:', err);
+      if (err.response) {
+        setError(err.response.data?.message || 'Authentication failed. Please try again.');
+      } else if (err.request) {
+        setError('Network error. Please check your connection.');
+      } else {
+        setError('Authentication failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

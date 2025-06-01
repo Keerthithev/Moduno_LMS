@@ -12,7 +12,21 @@ import {
   SkipForward,
   Shield,
   Eye,
+  Volume2,
+  VolumeX,
+  Maximize,
+  Minimize,
+  Settings,
+  ChevronRight,
+  Clock,
+  Video,
+  BookOpen,
+  RotateCcw,
+  Loader2
 } from "lucide-react"
+import { useParams, useNavigate } from 'react-router-dom'
+import axios from 'axios'
+import { toast } from 'react-toastify'
 
 // Simple Progress Bar Component
 const ProgressBar = ({ value, className = "" }) => (
@@ -24,242 +38,452 @@ const ProgressBar = ({ value, className = "" }) => (
   </div>
 )
 
-const CoursePlayer = ({ course, enrollment, user, onVideoComplete, onBack }) => {
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0)
-  const [courseCompleted, setCourseCompleted] = useState(false)
-  const [showVideoList, setShowVideoList] = useState(false)
-  const [hasMounted, setHasMounted] = useState(false)
-  const [completedVideos, setCompletedVideos] = useState([])
-  const [watchedPercentage, setWatchedPercentage] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isReviewMode, setIsReviewMode] = useState(false)
-  const [securityWarnings, setSecurityWarnings] = useState(0)
-  const [needsInteraction, setNeedsInteraction] = useState(false)
-
+const CoursePlayer = ({ course, enrollment, initialVideo, onBack, onVideoComplete, onProgressUpdate }) => {
+  const { courseId } = useParams()
+  const navigate = useNavigate()
   const videoRef = useRef(null)
+  const [currentVideo, setCurrentVideo] = useState(initialVideo)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [volume, setVolume] = useState(1)
+  const [isMuted, setIsMuted] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [showControls, setShowControls] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [videoDurations, setVideoDurations] = useState({})
+  const [courseProgress, setCourseProgress] = useState(0)
+  const [completedVideos, setCompletedVideos] = useState([])
+  const [buffering, setBuffering] = useState(false)
+  const [networkError, setNetworkError] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+  const maxRetries = 3
+  const [autoPlayEnabled, setAutoPlayEnabled] = useState(true)
+  const [autoPlayCountdown, setAutoPlayCountdown] = useState(null)
+  const autoPlayTimeoutRef = useRef(null)
+  const countdownIntervalRef = useRef(null)
 
-  // Enhanced Security: Block all known screenshot and screen recording methods
-  useEffect(() => {
-    let warningCount = 0
-
-    // Block keyboard shortcuts for screenshots and screen recording
-    const handleKeyDown = (e) => {
-      // Windows/Linux screenshot keys
-      const isWindowsScreenshot = e.key === "PrintScreen" || 
-                                (e.ctrlKey && e.key === "PrintScreen") ||
-                                (e.shiftKey && e.key === "PrintScreen")
-
-      // macOS screenshot keys
-      const isMacScreenshot = (e.metaKey && e.shiftKey && ["3", "4", "5"].includes(e.key)) ||
-                             (e.metaKey && e.ctrlKey && e.shiftKey && e.key === "4")
-
-      // Screen recording keys
-      const isScreenRecording = (e.metaKey && e.ctrlKey && e.key === "5")
-
-      // Developer tools keys
-      const isDevTools = (e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(e.key.toUpperCase())) ||
-                         (e.ctrlKey && e.key.toUpperCase() === "U") ||
-                         e.key === "F12"
-
-      if (isWindowsScreenshot || isMacScreenshot || isScreenRecording || isDevTools) {
-        e.preventDefault()
-        warningCount++
-        setSecurityWarnings(warningCount)
-        alert("Screenshots and screen recording are disabled to protect course content.")
-        
-        if (warningCount >= 3) {
-          alert("Multiple security violations detected. Please focus on your learning.")
-        }
-      }
-    }
-
-    // Block right-click menu
-    const handleContextMenu = (e) => {
-      e.preventDefault()
-      alert("Right-click is disabled to protect course content.")
-    }
-
-    // Block text selection
-    const preventSelect = (e) => e.preventDefault()
-
-    // Block drag/drop of content
-    const preventDrag = (e) => e.preventDefault()
-
-    // Block clipboard manipulation
-    const handleCopy = (e) => {
-      e.preventDefault()
-      alert("Copying content is disabled to protect course materials.")
-    }
-
-    // Block print screen via keyboard
-    const handleKeyUp = (e) => {
-      if (e.key === "PrintScreen") {
-        e.preventDefault()
-        alert("Screenshots are disabled to protect course content.")
-      }
-    }
-
-    // Add all event listeners
-    window.addEventListener("keydown", handleKeyDown)
-    window.addEventListener("keyup", handleKeyUp)
-    document.addEventListener("contextmenu", handleContextMenu)
-    document.addEventListener("selectstart", preventSelect)
-    document.addEventListener("dragstart", preventDrag)
-    document.addEventListener("copy", handleCopy)
-
-    // Cleanup function
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown)
-      window.removeEventListener("keyup", handleKeyUp)
-      document.removeEventListener("contextmenu", handleContextMenu)
-      document.removeEventListener("selectstart", preventSelect)
-      document.removeEventListener("dragstart", preventDrag)
-      document.removeEventListener("copy", handleCopy)
-    }
-  }, [])
-
-  // Detect tab switching
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setSecurityWarnings(prev => {
-          const newCount = prev + 1
-          if (newCount >= 3) {
-            alert("Multiple tab switches detected. For security purposes, please focus on your learning.")
-          }
-          return newCount
-        })
-        
-        if (videoRef.current && !videoRef.current.paused) {
-          videoRef.current.pause()
-          setIsPlaying(false)
-        }
-      }
-    }
-
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
-    }
-  }, [])
-
-  useEffect(() => {
-    setHasMounted(true)
-    setShowVideoList(true)
-  }, [])
-
-  // Initialize from enrollment data
+  // Initialize state from enrollment data
   useEffect(() => {
     if (enrollment?.progress) {
-      setCurrentVideoIndex(enrollment.progress.currentVideoIndex || 0)
-      const isCompleted = enrollment.progress.isCompleted || false
-      setCourseCompleted(isCompleted)
-      setIsReviewMode(isCompleted)
-      setCompletedVideos(
-        Array.isArray(enrollment.progress.completedVideos)
-          ? enrollment.progress.completedVideos
-          : []
-      )
-    }
-  }, [course, enrollment])
+      console.log("Initializing player from enrollment:", enrollment.progress);
+      
+      // Set completed videos
+      const completed = enrollment.progress.completedVideos || [];
+      setCompletedVideos(completed);
+      console.log("Setting completed videos:", completed);
+      
+      // Calculate course progress
+      if (course?.videos) {
+        const progress = Math.round(
+          (completed.length / course.videos.length) * 100
+        );
+        setCourseProgress(progress);
+        console.log("Set initial course progress:", progress);
+      }
 
-  // Attempt to auto-play when video changes
-  useEffect(() => {
-    if (videoRef.current && course?.videos?.[currentVideoIndex]) {
-      videoRef.current.load()
-      videoRef.current.play()
-        .then(() => {
-          setIsPlaying(true)
-          setNeedsInteraction(false)
-        })
-        .catch(error => {
-          console.log("Auto-play prevented:", error)
-          setIsPlaying(false)
-          setNeedsInteraction(true)
-        })
-    }
-  }, [currentVideoIndex, course])
-
-  const currentVideo = course?.videos?.[currentVideoIndex]
-  const progressPercentage = Math.round(
-    (completedVideos.length / (course?.videos?.length || 1)) * 100
-  )
-
-  const markVideoCompleted = (index, isComplete = false) => {
-    if (isReviewMode) return
-
-    const newCompletedVideos = [...new Set([...completedVideos, index])]
-    const isCourseComplete = isComplete || newCompletedVideos.length === course.videos.length
-
-    setCompletedVideos(newCompletedVideos)
-
-    if (isCourseComplete) {
-      setCourseCompleted(true)
-      setIsReviewMode(true)
-    }
-
-    onVideoComplete(index, isCourseComplete)
-  }
-
-  const handleProgress = (e) => {
-    const video = e.target
-    if (video.duration) {
-      const percentage = Math.round((video.currentTime / video.duration) * 100)
-      setWatchedPercentage(percentage)
-
-      if (percentage >= 95 && !completedVideos.includes(currentVideoIndex) && !isReviewMode) {
-        markVideoCompleted(currentVideoIndex)
+      // Set current video progress if it's completed
+      const currentVideoIndex = course.videos.indexOf(currentVideo);
+      if (completed.includes(currentVideoIndex)) {
+        setProgress(100);
+        console.log("Current video is completed, setting progress to 100");
       }
     }
+  }, [enrollment, course, currentVideo]);
+
+  // Add effect to sync completed videos whenever they change
+  useEffect(() => {
+    if (enrollment?.progress?.completedVideos) {
+      const completed = enrollment.progress.completedVideos;
+      console.log("Syncing completed videos:", completed);
+      setCompletedVideos(completed);
+      
+      // Update progress for current video if it's completed
+      const currentVideoIndex = course?.videos?.indexOf(currentVideo);
+      if (currentVideoIndex !== -1 && completed.includes(currentVideoIndex)) {
+        setProgress(100);
+      }
+    }
+  }, [enrollment?.progress?.completedVideos, currentVideo, course]);
+
+  // Handle video loading states
+  const handleWaiting = () => {
+    console.log("Video buffering...")
+    setBuffering(true)
   }
 
-  const handleVideoEnd = () => {
-    if (!completedVideos.includes(currentVideoIndex) && !isReviewMode) {
-      const isLastVideo = currentVideoIndex === course.videos.length - 1
-      markVideoCompleted(currentVideoIndex, isLastVideo)
+  const handleCanPlay = () => {
+    console.log("Video can play")
+    setBuffering(false)
+    setLoading(false)
+    setNetworkError(false)
+  }
+
+  const handleError = (error) => {
+    console.error("Video playback error:", error)
+    setNetworkError(true)
+    setBuffering(false)
+    
+    if (retryCount < maxRetries) {
+      console.log(`Retrying playback (${retryCount + 1}/${maxRetries})...`)
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.load()
+          setRetryCount(prev => prev + 1)
+        }
+      }, 2000) // Wait 2 seconds before retrying
+    } else {
+      toast.error("Video playback failed. Please check your network connection.")
     }
   }
 
-  const navigateVideo = (direction) => {
-    const newIndex = direction === "next" ? currentVideoIndex + 1 : currentVideoIndex - 1
-    if (newIndex >= 0 && newIndex < course.videos.length) {
-      setCurrentVideoIndex(newIndex)
-      setWatchedPercentage(0)
-      setIsPlaying(false)
+  // Reset retry count when changing videos
+  useEffect(() => {
+    setRetryCount(0)
+    setNetworkError(false)
+  }, [currentVideo])
+
+  // Monitor network state
+  useEffect(() => {
+    const handleNetworkChange = () => {
+      if (!navigator.onLine) {
+        console.log("Network connection lost")
+        setNetworkError(true)
+        if (videoRef.current) {
+          videoRef.current.pause()
+        }
+        toast.error("Network connection lost. Please check your internet connection.")
+      } else {
+        console.log("Network connection restored")
+        setNetworkError(false)
+        if (videoRef.current && isPlaying) {
+          videoRef.current.play().catch(console.error)
+        }
+      }
+    }
+
+    window.addEventListener('online', handleNetworkChange)
+    window.addEventListener('offline', handleNetworkChange)
+
+    return () => {
+      window.removeEventListener('online', handleNetworkChange)
+      window.removeEventListener('offline', handleNetworkChange)
+    }
+  }, [isPlaying])
+
+  // Clear all timeouts and intervals
+  const clearAutoPlayTimers = () => {
+    if (autoPlayTimeoutRef.current) {
+      clearTimeout(autoPlayTimeoutRef.current)
+      autoPlayTimeoutRef.current = null
+    }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current)
+      countdownIntervalRef.current = null
+    }
+    setAutoPlayCountdown(null)
+  }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearAutoPlayTimers()
+    }
+  }, [])
+
+  // Update the saveVideoCompletion function
+  const saveVideoCompletion = async (videoIndex) => {
+    if (!completedVideos.includes(videoIndex)) {
+      console.log("Saving video completion for index:", videoIndex);
+      
+      const newCompletedVideos = [...completedVideos, videoIndex];
+      const isAllCompleted = newCompletedVideos.length === course.videos.length;
+      
+      console.log("Completion status:", {
+        newCompletedVideos,
+        totalVideos: course.videos.length,
+        isAllCompleted
+      });
+
+      setCompletedVideos(newCompletedVideos);
+      
+      const newProgress = Math.round((newCompletedVideos.length / course.videos.length) * 100);
+      setCourseProgress(newProgress);
+      
+      if (onVideoComplete) {
+        try {
+          await onVideoComplete(videoIndex, isAllCompleted);
+          console.log("Video completion saved successfully");
+          
+          if (isAllCompleted) {
+            console.log("All videos completed, course finished!");
+          }
+        } catch (error) {
+          console.error("Error saving video completion:", error);
+          // Still update local state even if API fails
+          setCompletedVideos(newCompletedVideos);
+          setCourseProgress(newProgress);
+        }
+      }
+    }
+  };
+
+  // Update handleTimeUpdate to check for course completion
+  const handleTimeUpdate = () => {
+    if (videoRef.current && !buffering && !networkError) {
+      const currentTime = videoRef.current.currentTime;
+      const duration = videoRef.current.duration;
+      const progressPercent = (currentTime / duration) * 100;
+      
+      setProgress(progressPercent);
+      setDuration(duration);
+
+      if (currentTime > 1) {
+        const videoIndex = course.videos.indexOf(currentVideo);
+        debouncedProgressUpdate(videoIndex, currentTime);
+      }
+
+      // Mark as complete at 90% and check for course completion
+      if (progressPercent >= 90) {
+        const videoIndex = course.videos.indexOf(currentVideo);
+        if (!completedVideos.includes(videoIndex)) {
+          console.log("Video reached 90% completion, marking as complete");
+          saveVideoCompletion(videoIndex).catch(error => {
+            console.error("Error saving video completion at 90%:", error);
+          });
+        }
+      }
+    }
+  };
+
+  // Update handleVideoEnded to ensure completion status is properly set
+  const handleVideoEnded = async () => {
+    const videoIndex = course.videos.indexOf(currentVideo);
+    console.log("Video ended at index:", videoIndex);
+    
+    try {
+      // Save completion status first
+      await saveVideoCompletion(videoIndex);
+
+      const nextVideo = getNextVideo();
+      const isLastVideo = !nextVideo;
+      
+      console.log("Video end status:", {
+        currentIndex: videoIndex,
+        hasNextVideo: !!nextVideo,
+        isLastVideo,
+        completedVideos: completedVideos.length,
+        totalVideos: course.videos.length
+      });
+
+      if (nextVideo && autoPlayEnabled) {
+        console.log("Setting up autoplay for next video");
+        setAutoPlayCountdown(10);
+        
+        countdownIntervalRef.current = setInterval(() => {
+          setAutoPlayCountdown(prev => {
+            if (prev <= 1) {
+              clearInterval(countdownIntervalRef.current);
+              return null;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+
+        autoPlayTimeoutRef.current = setTimeout(() => {
+          clearAutoPlayTimers();
+          setCurrentVideo(nextVideo);
+          
+          setTimeout(() => {
+            if (videoRef.current) {
+              videoRef.current.play().catch(console.error);
+            }
+          }, 500);
+        }, 10000);
+      } else if (isLastVideo) {
+        console.log("Last video completed, marking course as complete");
+        if (onVideoComplete) {
+          await onVideoComplete(videoIndex, true);
+        }
+      }
+    } catch (error) {
+      console.error("Error in video end handling:", error);
+      toast.error("Error updating progress. Please try again.");
+      clearAutoPlayTimers();
+    }
+  };
+
+  // Cancel auto-play
+  const cancelAutoPlay = () => {
+    console.log("Auto-play cancelled by user")
+    clearAutoPlayTimers()
+    setAutoPlayEnabled(false)
+    toast.info("Auto-play disabled. Click play on any video to resume watching.")
+  }
+
+  // Enable auto-play
+  const enableAutoPlay = () => {
+    setAutoPlayEnabled(true)
+    toast.success("Auto-play enabled")
+  }
+
+  // Update video selection to maintain completion status
+  const selectVideo = (video) => {
+    console.log("Selecting video:", video);
+    setLoading(true);
+    clearAutoPlayTimers();
+    
+    const videoIndex = course.videos.indexOf(video);
+    const isCompleted = completedVideos.includes(videoIndex);
+    console.log("Video selection state:", { videoIndex, isCompleted, completedVideos });
+    
+    setCurrentVideo(video);
+    setProgress(isCompleted ? 100 : 0);
+    
+    // Reset video position and preload
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.preload = "auto";
+      videoRef.current.load();
+    }
+    
+    // Only auto-play if enabled and not completed
+    if (autoPlayEnabled && !isCompleted) {
+      setIsPlaying(true);
+    } else {
+      setIsPlaying(false);
+    }
+  };
+
+  // Add this helper function to get next video
+  const getNextVideo = () => {
+    if (!course?.videos || !currentVideo) return null
+    const currentIndex = course.videos.indexOf(currentVideo)
+    if (currentIndex < course.videos.length - 1) {
+      return course.videos[currentIndex + 1]
+    }
+    return null
+  }
+
+  // Add debounce utility at the top level
+  const debounce = (func, wait) => {
+    let timeout
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout)
+        func(...args)
+      }
+      clearTimeout(timeout)
+      timeout = setTimeout(later, wait)
     }
   }
 
-  const canNavigate = (direction) => {
-    if (direction === "prev") return currentVideoIndex > 0
-    if (direction === "next") {
-      if (currentVideoIndex >= course.videos.length - 1) return false
-      if (isReviewMode) return true
-      return completedVideos.includes(currentVideoIndex)
-    }
-    return true
-  }
+  // Debounced progress update function
+  const debouncedProgressUpdate = useRef(
+    debounce((videoIndex, currentTime) => {
+      if (onProgressUpdate) {
+        onProgressUpdate(videoIndex, currentTime)
+      }
+    }, 2000) // Update every 2 seconds at most
+  ).current
 
-  const togglePlayPause = () => {
-    if (!videoRef.current) {
-      console.error("Video element not found")
+  useEffect(() => {
+    if (!course || !course.videos || course.videos.length === 0) {
       return
     }
 
-    if (videoRef.current.paused) {
-      videoRef.current.play()
-        .then(() => {
-          setIsPlaying(true)
-          setNeedsInteraction(false)
-        })
-        .catch(error => {
-          console.error("Playback failed:", error)
-          setNeedsInteraction(true)
-          alert("Please click the play button to start the video")
-        })
-    } else {
-      videoRef.current.pause()
-      setIsPlaying(false)
+    // If no initial video is provided, start with the first video
+    if (!currentVideo) {
+      setCurrentVideo(course.videos[0])
     }
+  }, [course, currentVideo])
+
+  useEffect(() => {
+    // Calculate overall course progress
+    if (course?.videos && enrollment?.progress?.completedVideos) {
+      const progress = Math.round(
+        (enrollment.progress.completedVideos.length / course.videos.length) * 100
+      )
+      setCourseProgress(progress)
+    }
+  }, [course, enrollment])
+
+  // Update useEffect for enrollment changes
+  useEffect(() => {
+    if (enrollment?.progress?.completedVideos) {
+      console.log("Updating completed videos from enrollment:", enrollment.progress.completedVideos);
+      setCompletedVideos(enrollment.progress.completedVideos);
+    }
+  }, [enrollment?.progress?.completedVideos]);
+
+  const handlePlayPause = () => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause()
+      } else {
+        videoRef.current.play()
+      }
+      setIsPlaying(!isPlaying)
+    }
+  }
+
+  const handleRestart = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0
+      setProgress(0)
+      videoRef.current.play()
+      setIsPlaying(true)
+    }
+  }
+
+  const handleVolumeChange = (e) => {
+    const value = parseFloat(e.target.value)
+    setVolume(value)
+    if (videoRef.current) {
+      videoRef.current.volume = value
+    }
+    setIsMuted(value === 0)
+  }
+
+  const toggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !isMuted
+      setIsMuted(!isMuted)
+      setVolume(isMuted ? 1 : 0)
+    }
+  }
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      videoRef.current.requestFullscreen()
+      setIsFullscreen(true)
+    } else {
+      document.exitFullscreen()
+      setIsFullscreen(false)
+    }
+  }
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      const duration = videoRef.current.duration
+      setVideoDurations(prev => ({
+        ...prev,
+        [currentVideo.url]: duration
+      }))
+      setDuration(duration)
+
+      // Set video playback quality
+      if (videoRef.current.videoHeight >= 720) {
+        videoRef.current.playbackQuality = "high"
+      }
+    }
+  }
+
+  const formatDuration = (seconds) => {
+    if (!seconds || isNaN(seconds)) return "0:00"
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = Math.floor(seconds % 60)
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
   if (!course || !course.videos || course.videos.length === 0) {
@@ -272,10 +496,10 @@ const CoursePlayer = ({ course, enrollment, user, onVideoComplete, onBack }) => 
           <h3 className="text-xl font-semibold mb-2">No Videos Available</h3>
           <p className="text-gray-600 mb-6">This course doesn't contain any video content yet.</p>
           <button
-            onClick={onBack}
+            onClick={() => navigate(-1)}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            Back to Courses
+            Back to Course
           </button>
         </div>
       </div>
@@ -283,234 +507,330 @@ const CoursePlayer = ({ course, enrollment, user, onVideoComplete, onBack }) => 
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Security Warning */}
-      {securityWarnings > 0 && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
-          <div className="flex items-center">
-            <Shield className="h-5 w-5 text-red-400 mr-2" />
-            <p className="text-red-700">
-              Security Notice: Suspicious activity detected ({securityWarnings} times). Please focus on your learning.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="bg-white border-b px-4 lg:px-8 h-16 flex items-center justify-between shadow-sm">
-        <div className="flex items-center space-x-4">
+    <div className="min-h-screen" style={{
+      background: "linear-gradient(135deg, #0B2545 0%, #172A57 50%, #1E3A8A 100%)",
+      fontFamily: "Inter, system-ui, sans-serif",
+      color: "white",
+    }}>
+      <div className="max-w-7xl mx-auto p-6 space-y-8">
+        {/* Header with Progress */}
+        <div className="flex flex-col space-y-4">
+          <div className="flex items-center justify-between">
           <button
             onClick={onBack}
-            className="flex items-center px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ChevronLeft className="h-5 w-5 mr-2" />
-            Back to Courses
+              className="flex items-center px-4 py-2 rounded-xl transition-all duration-300 hover:scale-105"
+              style={{
+                background: "rgba(255, 255, 255, 0.1)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                backdropFilter: "blur(10px)",
+              }}>
+              <ChevronLeft className="h-5 w-5 mr-2 text-[#93C5FD]" />
+              <span className="text-[#93C5FD]">Back to Course</span>
           </button>
-          <div className="hidden md:block">
-            <h1 className="font-semibold text-lg text-gray-900">{course.title}</h1>
             <div className="flex items-center space-x-2">
-              <p className="text-sm text-gray-500">
-                Lesson {currentVideoIndex + 1} of {course.videos.length}
-              </p>
-              {isReviewMode && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  <Eye className="h-3 w-3 mr-1" />
-                  Review Mode
-                </span>
-              )}
+              <span className="text-[#93C5FD]">Course Progress:</span>
+              <span className="text-white font-bold">{courseProgress}%</span>
             </div>
           </div>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          <div className="hidden md:flex items-center space-x-2">
-            <ProgressBar value={progressPercentage} className="w-32" />
-            <span className="text-sm text-gray-500 min-w-[3rem]">{progressPercentage}%</span>
+          
+          {/* Progress Bar */}
+          <div className="w-full h-2 rounded-full overflow-hidden"
+            style={{ background: "rgba(255, 255, 255, 0.1)" }}>
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{
+                width: `${courseProgress}%`,
+                background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+              }}
+            />
           </div>
-
-          <button
-            onClick={() => setShowVideoList(!showVideoList)}
-            className="flex items-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <List className="h-4 w-4 mr-2" />
-            Contents
-          </button>
         </div>
-      </div>
 
-      <div className="flex">
-        {/* Sidebar - Video List */}
-        {hasMounted && showVideoList && (
-          <div className="w-80 bg-white border-r border-gray-200 h-[calc(100vh-4rem)] overflow-y-auto">
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex justify-between items-center mb-3">
-                <h2 className="text-lg font-semibold">Course Content</h2>
-                <button onClick={() => setShowVideoList(false)} className="text-gray-500 hover:text-gray-700 p-1">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <ProgressBar value={progressPercentage} />
-              <div className="flex justify-between text-sm text-gray-600 mt-2">
-                <span>
-                  {completedVideos.length} of {course.videos.length} completed
-                </span>
-                <span>{progressPercentage}%</span>
-              </div>
-              {isReviewMode && (
-                <div className="mt-2 p-2 bg-green-50 rounded-lg">
-                  <p className="text-xs text-green-700 font-medium">✓ Course Completed - Review Mode Active</p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Video Player */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="relative rounded-2xl overflow-hidden"
+              style={{
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                backdropFilter: "blur(20px)",
+              }}>
+              {currentVideo ? (
+                <>
+                  <video
+                    ref={videoRef}
+                    src={currentVideo.url}
+                    className="w-full aspect-video"
+                    onTimeUpdate={handleTimeUpdate}
+                    onEnded={handleVideoEnded}
+                    onLoadedMetadata={handleLoadedMetadata}
+                    onWaiting={handleWaiting}
+                    onCanPlay={handleCanPlay}
+                    onError={(e) => handleError(e)}
+                    onClick={handlePlayPause}
+                    playsInline // Better mobile support
+                    preload="auto" // Enable preloading
+                  />
+
+                  {/* Loading/Buffering Overlay */}
+                  {(loading || buffering) && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <div className="flex flex-col items-center">
+                        <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+                        <p className="mt-2 text-white">
+                          {loading ? "Loading video..." : "Buffering..."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Network Error Overlay */}
+                  {networkError && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <div className="flex flex-col items-center p-6 rounded-lg bg-red-500/20">
+                        <X className="h-12 w-12 text-red-500 mb-2" />
+                        <p className="text-white text-center">
+                          Network error occurred.
+                          <br />
+                          Please check your connection.
+                        </p>
+                        {retryCount < maxRetries && (
+                          <button
+                            onClick={() => {
+                              if (videoRef.current) {
+                                videoRef.current.load()
+                                setRetryCount(prev => prev + 1)
+                              }
+                            }}
+                            className="mt-4 px-4 py-2 bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors"
+                          >
+                            Retry Playback
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Video Controls */}
+                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                    {/* Progress Bar */}
+                    <div
+                      className="relative h-1 mb-4 cursor-pointer rounded-full overflow-hidden"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect()
+                        const x = e.clientX - rect.left
+                        const clickedProgress = (x / rect.width) * 100
+                        if (videoRef.current) {
+                          videoRef.current.currentTime = (clickedProgress / 100) * videoRef.current.duration
+                        }
+                      }}
+                      style={{ background: "rgba(255, 255, 255, 0.2)" }}
+                    >
+                      <div
+                        className="absolute top-0 left-0 h-full rounded-full transition-all duration-300"
+                        style={{
+                          width: `${progress}%`,
+                          background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <button
+                          onClick={handlePlayPause}
+                          className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                        >
+                          {isPlaying ? (
+                            <Pause className="h-6 w-6 text-white" />
+                          ) : (
+                            <Play className="h-6 w-6 text-white" />
+                          )}
+                        </button>
+
+                        <button
+                          onClick={handleRestart}
+                          className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                        >
+                          <RotateCcw className="h-6 w-6 text-white" />
+                        </button>
+
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={toggleMute}
+                            className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                          >
+                            {isMuted ? (
+                              <VolumeX className="h-5 w-5 text-white" />
+                            ) : (
+                              <Volume2 className="h-5 w-5 text-white" />
+                            )}
+                          </button>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            value={volume}
+                            onChange={handleVolumeChange}
+                            className="w-20"
+                          />
+                        </div>
+
+                        <div className="text-sm text-white">
+                          <span>{formatDuration(videoRef.current?.currentTime || 0)}</span>
+                          <span> / </span>
+                          <span>{formatDuration(duration)}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={toggleFullscreen}
+                          className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                        >
+                          {isFullscreen ? (
+                            <Minimize className="h-5 w-5 text-white" />
+                          ) : (
+                            <Maximize className="h-5 w-5 text-white" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="aspect-video flex items-center justify-center">
+                  <p className="text-[#93C5FD]">Loading video...</p>
                 </div>
               )}
             </div>
 
-            <div className="p-2">
-              {course.videos.map((video, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    setCurrentVideoIndex(index)
-                    setWatchedPercentage(0)
-                  }}
-                  className={`w-full text-left p-3 rounded-lg flex items-center space-x-3 transition-colors mb-1 ${
-                    index === currentVideoIndex
-                      ? "bg-blue-50 text-blue-600 border border-blue-200"
-                      : "hover:bg-gray-100"
-                  }`}
-                >
-                  <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
-                    {completedVideos.includes(index) ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <span className="text-sm text-gray-500">{index + 1}</span>
-                    )}
+            {/* Video Info */}
+            {currentVideo && (
+              <div className="rounded-2xl p-6 space-y-4"
+                style={{
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  backdropFilter: "blur(20px)",
+                }}>
+                <h2 className="text-2xl font-bold text-white">{currentVideo.title}</h2>
+                <p className="text-[#93C5FD]">{currentVideo.description}</p>
+                <div className="flex items-center space-x-4 text-sm text-[#93C5FD]">
+                  <div className="flex items-center">
+                    <Clock className="h-4 w-4 mr-2" />
+                    <span>Duration: {formatDuration(videoDurations[currentVideo.url])}</span>
                   </div>
-                  <span className="truncate font-medium">{video.title}</span>
-                  {isReviewMode && <Eye className="h-4 w-4 text-gray-400 ml-auto" />}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Main Video Player */}
-        <div className="flex-1">
-          <div className="bg-black aspect-video relative">
-            {/* Security Overlay */}
-            <div className="absolute inset-0 pointer-events-none z-10">
-              <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
-                🔒 Protected Content
-              </div>
-            </div>
-
-            {/* Play overlay when interaction is needed */}
-            {!isPlaying && (
-              <div 
-                className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 cursor-pointer"
-                onClick={togglePlayPause}
-              >
-                <div className="p-4 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors">
-                  <Play className="h-8 w-8 text-white" />
                 </div>
               </div>
             )}
-
-            <video
-              ref={videoRef}
-              src={currentVideo.url}
-              controls={false}
-              controlsList="nodownload"
-              disablePictureInPicture
-              className="w-full h-full"
-              onTimeUpdate={handleProgress}
-              onEnded={handleVideoEnd}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-              onLoadedData={() => setWatchedPercentage(0)}
-              style={{ userSelect: "none" }}
-            />
           </div>
 
-          {/* Video Controls */}
-          <div className="bg-white p-6 border-t border-gray-200">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="text-xl font-bold mb-2">{currentVideo.title}</h3>
-                  <div className="flex items-center space-x-4 text-sm text-gray-600">
-                    <span>
-                      Video {currentVideoIndex + 1} of {course.videos.length}
-                    </span>
-                    <span>•</span>
-                    <span>{watchedPercentage}% watched</span>
-                    {isReviewMode && (
-                      <>
-                        <span>•</span>
-                        <span className="text-green-600 font-medium">✓ Completed</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {!isReviewMode && !completedVideos.includes(currentVideoIndex) && (
-                  <div className="text-right">
-                    <p className="text-sm text-orange-600 font-medium">Watch 95% to complete</p>
-                    <div className="w-24 mt-1">
-                      <ProgressBar value={watchedPercentage} />
-                    </div>
-                  </div>
-                )}
+          {/* Video List */}
+          <div className="rounded-2xl p-6 space-y-6"
+            style={{
+              background: "rgba(255, 255, 255, 0.08)",
+              border: "1px solid rgba(255, 255, 255, 0.15)",
+              backdropFilter: "blur(20px)",
+            }}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold text-white">Course Content</h3>
+              <div className="flex items-center space-x-2 text-[#93C5FD] text-sm">
+                <Video className="h-4 w-4" />
+                <span>{course?.videos?.length || 0} videos</span>
               </div>
+            </div>
 
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => navigateVideo("prev")}
-                  disabled={!canNavigate("prev")}
-                  className={`flex items-center px-4 py-2 rounded-lg font-medium ${
-                    canNavigate("prev")
-                      ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                      : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  }`}
-                >
-                  <SkipBack className="h-4 w-4 mr-2" />
-                  Previous
-                </button>
-
-                <div className="flex items-center space-x-2">
+            <div className="space-y-3">
+              {course?.videos?.map((video, index) => {
+                const isCompleted = completedVideos.includes(index)
+                const isCurrent = currentVideo?.url === video.url
+                const videoDuration = videoDurations[video.url]
+                
+                return (
                   <button
-                    onClick={togglePlayPause}
-                    className="flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+                    key={index}
+                    onClick={() => setCurrentVideo(video)}
+                    className={`w-full p-4 rounded-xl transition-all duration-300 hover:scale-105 text-left ${
+                      isCurrent
+                        ? "bg-[#3B82F6]/20 border border-[#3B82F6]/30"
+                        : isCompleted
+                        ? "bg-green-500/10 border border-green-500/30"
+                        : "hover:bg-white/5"
+                    }`}
+                    style={{
+                      background: isCurrent
+                        ? "rgba(59, 130, 246, 0.1)"
+                        : isCompleted
+                        ? "rgba(16, 185, 129, 0.1)"
+                        : "rgba(255, 255, 255, 0.05)",
+                      border: isCurrent
+                        ? "1px solid rgba(59, 130, 246, 0.3)"
+                        : isCompleted
+                        ? "1px solid rgba(16, 185, 129, 0.3)"
+                        : "1px solid rgba(255, 255, 255, 0.1)",
+                    }}
                   >
-                    {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        {isCompleted ? (
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                        ) : isCurrent ? (
+                          <Play className="h-5 w-5 text-[#3B82F6]" />
+                        ) : (
+                          <Video className="h-5 w-5 text-[#93C5FD]" />
+                        )}
+                        <div className="flex flex-col">
+                          <span className={`font-medium ${
+                            isCurrent ? "text-[#3B82F6]" : isCompleted ? "text-green-500" : "text-white"
+                          }`}>
+                            {video.title}
+                          </span>
+                          <span className="text-sm text-[#93C5FD]">
+                            {formatDuration(videoDuration)}
+                          </span>
+                        </div>
+                      </div>
+                      {isCompleted && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-500">
+                          Completed
+                        </span>
+                      )}
+                    </div>
                   </button>
-                </div>
-
-                <button
-                  onClick={() => navigateVideo("next")}
-                  disabled={!canNavigate("next")}
-                  className={`flex items-center px-4 py-2 rounded-lg font-medium ${
-                    canNavigate("next")
-                      ? "bg-blue-600 hover:bg-blue-700 text-white"
-                      : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  }`}
-                >
-                  Next
-                  <SkipForward className="h-4 w-4 ml-2" />
-                </button>
-              </div>
-
-              {needsInteraction && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-800">Click the play button to start the video</p>
-                </div>
-              )}
-
-              {!isReviewMode && !canNavigate("next") && currentVideoIndex < course.videos.length - 1 && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-800">Complete this video to unlock the next lesson.</p>
-                </div>
-              )}
+                )
+              })}
             </div>
           </div>
+        </div>
+
+        {/* Auto-play countdown overlay */}
+        {autoPlayCountdown && (
+          <div className="absolute top-4 right-4 bg-black/80 rounded-lg p-4 text-white flex items-center space-x-4">
+            <div>
+              <p>Next video in {autoPlayCountdown}s</p>
+            </div>
+            <button
+              onClick={cancelAutoPlay}
+              className="px-3 py-1 bg-red-500 rounded hover:bg-red-600 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* Add auto-play toggle in video controls */}
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={autoPlayEnabled ? cancelAutoPlay : enableAutoPlay}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              autoPlayEnabled 
+                ? 'bg-green-500 hover:bg-green-600' 
+                : 'bg-gray-500 hover:bg-gray-600'
+            }`}
+          >
+            Auto-play: {autoPlayEnabled ? 'On' : 'Off'}
+          </button>
         </div>
       </div>
     </div>

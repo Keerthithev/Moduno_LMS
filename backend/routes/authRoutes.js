@@ -16,4 +16,5 @@ router.get('/linkedin/callback', authController.linkedinAuth);
 router.get('/me', authController.getMe );
 router.put('/updatedetails',  authController.updateDetails);
 router.put('/updatepassword',  authController.updatePassword);
+router.get('/auth/verify-token', authController.verifyToken);
 module.exports = router;

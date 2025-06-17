@@ -93,7 +93,23 @@ const Login = () => {
     
     try {
       const res = await axiosInstance.post('/login', formData);
-      login(res.data.token, res.data.user);
+      
+      // Normalize user data structure
+      const userData = {
+        _id: res.data.user.id || res.data.user._id,
+        name: res.data.user.name,
+        email: res.data.user.email,
+        role: res.data.user.role,
+        // Add any other necessary fields
+      };
+      
+      // Use the AuthContext login
+      login(res.data.token, userData);
+      
+      // Update localStorage with normalized data
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', res.data.token);
+      
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
@@ -112,7 +128,22 @@ const Login = () => {
       );
 
       if (res.data && res.data.token && res.data.user) {
-        login(res.data.token, res.data.user);
+        // Normalize user data structure
+        const userData = {
+          _id: res.data.user.id || res.data.user._id,
+          name: res.data.user.name,
+          email: res.data.user.email,
+          role: res.data.user.role,
+          // Add any other necessary fields
+        };
+        
+        // Use the AuthContext login
+        login(res.data.token, userData);
+        
+        // Update localStorage with normalized data
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('token', res.data.token);
+        
         navigate('/dashboard');
       } else {
         setError('Invalid response from server');

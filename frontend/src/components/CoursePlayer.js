@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useContext } from "react"
 import {
   CheckCircle,
   ChevronLeft,
@@ -22,11 +22,14 @@ import {
   Video,
   BookOpen,
   RotateCcw,
-  Loader2
+  Loader2,
+  Award
 } from "lucide-react"
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { toast } from 'react-toastify'
+import { toast, ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+import { AuthContext } from '../context/AuthContext'
 
 // Simple Progress Bar Component
 const ProgressBar = ({ value, className = "" }) => (
@@ -62,6 +65,9 @@ const CoursePlayer = ({ course, enrollment, initialVideo, onBack, onVideoComplet
   const [autoPlayCountdown, setAutoPlayCountdown] = useState(null)
   const autoPlayTimeoutRef = useRef(null)
   const countdownIntervalRef = useRef(null)
+
+  // Add user context
+  const { user: authUser } = useContext(AuthContext);
 
   // Initialize state from enrollment data
   useEffect(() => {
@@ -191,125 +197,325 @@ const CoursePlayer = ({ course, enrollment, initialVideo, onBack, onVideoComplet
     }
   }, [])
 
-  // Update the saveVideoCompletion function
+  // Update progress storage key to be user-specific
+  const getProgressStorageKey = () => {
+    return `course_progress_${authUser?._id}_${course?._id}`;
+  };
+
+  // Update handleTimeUpdate to track partial progress
+  const handleTimeUpdate = () => {
+    if (!videoRef.current || buffering || networkError) return;
+
+    const currentTime = videoRef.current.currentTime;
+    const duration = videoRef.current.duration;
+    
+    if (isNaN(currentTime) || isNaN(duration)) return;
+    
+    const progressPercent = (currentTime / duration) * 100;
+    setProgress(progressPercent);
+    setDuration(duration);
+
+    // Update progress every 5 seconds if we're past 1 second
+    if (currentTime > 1) {
+      const videoIndex = course.videos.indexOf(currentVideo);
+      
+      // Store partial progress
+      const progressData = {
+        userId: authUser?._id,
+        courseId: course?._id,
+        videoIndex,
+        currentTime,
+        lastUpdated: new Date().toISOString(),
+        completed: completedVideos
+      };
+
+      // Save to localStorage with user-specific key
+      localStorage.setItem(getProgressStorageKey(), JSON.stringify(progressData));
+
+      // Update backend through parent component
+      if (onProgressUpdate) {
+        onProgressUpdate(videoIndex, currentTime);
+      }
+    }
+
+    // Mark as complete at 95% to ensure we're really near the end
+    if (progressPercent >= 95) {
+      const videoIndex = course.videos.indexOf(currentVideo);
+      if (!completedVideos.includes(videoIndex)) {
+        console.log("Video reached 95% completion, marking as complete");
+        saveVideoCompletion(videoIndex).catch(error => {
+          console.error("Error saving video completion at 95%:", error);
+        });
+      }
+    }
+  };
+
+  // Load saved progress on component mount
+  useEffect(() => {
+    if (!authUser?._id || !course?._id) return;
+
+    try {
+      const savedProgress = localStorage.getItem(getProgressStorageKey());
+      if (savedProgress) {
+        const progressData = JSON.parse(savedProgress);
+        
+        // Verify the data belongs to current user and course
+        if (progressData.userId === authUser._id && 
+            progressData.courseId === course._id) {
+          
+          // Restore completed videos
+          if (Array.isArray(progressData.completed)) {
+            setCompletedVideos(progressData.completed);
+          }
+
+          // If we're loading the same video, restore its progress
+          const currentVideoIndex = course.videos.indexOf(currentVideo);
+          if (currentVideoIndex === progressData.videoIndex && videoRef.current) {
+            videoRef.current.currentTime = progressData.currentTime;
+          }
+        } else {
+          // Clear invalid data
+          localStorage.removeItem(getProgressStorageKey());
+        }
+      }
+    } catch (error) {
+      console.error("Error loading saved progress:", error);
+      localStorage.removeItem(getProgressStorageKey());
+    }
+  }, [authUser?._id, course?._id, currentVideo]);
+
+  // Clear progress on unmount
+  useEffect(() => {
+    return () => {
+      // Only clear if user completes the course
+      if (completedVideos.length === course?.videos?.length) {
+        localStorage.removeItem(getProgressStorageKey());
+      }
+    };
+  }, [completedVideos.length, course?.videos?.length]);
+
+  // Update saveVideoCompletion to be more robust
   const saveVideoCompletion = async (videoIndex) => {
     if (!completedVideos.includes(videoIndex)) {
-      console.log("Saving video completion for index:", videoIndex);
-      
-      const newCompletedVideos = [...completedVideos, videoIndex];
-      const isAllCompleted = newCompletedVideos.length === course.videos.length;
-      
-      console.log("Completion status:", {
-        newCompletedVideos,
-        totalVideos: course.videos.length,
-        isAllCompleted
-      });
+      try {
+        console.log("Saving video completion for index:", videoIndex);
+        
+        // Create new array with current video added
+        const newCompletedVideos = [...completedVideos, videoIndex];
+        
+        // Calculate if this completes the course
+        const isAllCompleted = course?.videos && 
+          newCompletedVideos.length === course.videos.length;
+        
+        console.log("Completion status:", {
+          newCompletedVideos,
+          totalVideos: course?.videos?.length || 0,
+          isAllCompleted
+        });
 
-      setCompletedVideos(newCompletedVideos);
-      
-      const newProgress = Math.round((newCompletedVideos.length / course.videos.length) * 100);
-      setCourseProgress(newProgress);
-      
-      if (onVideoComplete) {
-        try {
+        // Update local state first
+        setCompletedVideos(newCompletedVideos);
+        
+        // Update localStorage
+        const progressData = {
+          userId: authUser?._id,
+          courseId: course?._id,
+          videoIndex,
+          currentTime: videoRef.current?.currentTime || 0,
+          lastUpdated: new Date().toISOString(),
+          completed: newCompletedVideos
+        };
+        localStorage.setItem(getProgressStorageKey(), JSON.stringify(progressData));
+        
+        // Calculate and update progress
+        const newProgress = Math.round(
+          (newCompletedVideos.length / (course?.videos?.length || 1)) * 100
+        );
+        setCourseProgress(newProgress);
+        
+        // Call parent completion handler
+        if (onVideoComplete) {
           await onVideoComplete(videoIndex, isAllCompleted);
           console.log("Video completion saved successfully");
           
           if (isAllCompleted) {
             console.log("All videos completed, course finished!");
+            toast.success("Congratulations! Course completed! 🎉");
+            // Clear localStorage on course completion
+            localStorage.removeItem(getProgressStorageKey());
           }
-        } catch (error) {
-          console.error("Error saving video completion:", error);
-          // Still update local state even if API fails
-          setCompletedVideos(newCompletedVideos);
-          setCourseProgress(newProgress);
         }
+      } catch (error) {
+        console.error("Error saving video completion:", error);
+        // Revert local state on error
+        setCompletedVideos(prev => prev.filter(v => v !== videoIndex));
+        setCourseProgress(prev => 
+          Math.round((completedVideos.length / (course?.videos?.length || 1)) * 100)
+        );
+        toast.error("Failed to save progress. Please try again.");
       }
     }
   };
 
-  // Update handleTimeUpdate to check for course completion
-  const handleTimeUpdate = () => {
-    if (videoRef.current && !buffering && !networkError) {
-      const currentTime = videoRef.current.currentTime;
-      const duration = videoRef.current.duration;
-      const progressPercent = (currentTime / duration) * 100;
-      
-      setProgress(progressPercent);
-      setDuration(duration);
-
-      if (currentTime > 1) {
-        const videoIndex = course.videos.indexOf(currentVideo);
-        debouncedProgressUpdate(videoIndex, currentTime);
-      }
-
-      // Mark as complete at 90% and check for course completion
-      if (progressPercent >= 90) {
-        const videoIndex = course.videos.indexOf(currentVideo);
-        if (!completedVideos.includes(videoIndex)) {
-          console.log("Video reached 90% completion, marking as complete");
-          saveVideoCompletion(videoIndex).catch(error => {
-            console.error("Error saving video completion at 90%:", error);
-          });
-        }
-      }
-    }
-  };
-
-  // Update handleVideoEnded to ensure completion status is properly set
+  // Update handleVideoEnded to include delay
   const handleVideoEnded = async () => {
+    if (!course?.videos || !currentVideo) return;
     const videoIndex = course.videos.indexOf(currentVideo);
-    console.log("Video ended at index:", videoIndex);
+    console.log("Video ended naturally");
     
-    try {
-      // Save completion status first
-      await saveVideoCompletion(videoIndex);
+    // Mark current video as complete
+    await handleVideoComplete(videoIndex, true);
 
-      const nextVideo = getNextVideo();
-      const isLastVideo = !nextVideo;
+    // Add a delay before proceeding
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Check for next video
+    const nextVideo = getNextVideo();
+    const isLastVideo = !nextVideo;
+    
+    console.log("Video end status:", {
+      currentIndex: videoIndex,
+      hasNextVideo: !!nextVideo,
+      isLastVideo,
+      autoPlayEnabled,
+      completedVideos: completedVideos.length,
+      totalVideos: course.videos.length
+    });
+
+    // Handle autoplay
+    if (nextVideo && autoPlayEnabled) {
+      console.log("Setting up autoplay for next video");
+      setAutoPlayCountdown(10);
       
-      console.log("Video end status:", {
-        currentIndex: videoIndex,
-        hasNextVideo: !!nextVideo,
-        isLastVideo,
-        completedVideos: completedVideos.length,
-        totalVideos: course.videos.length
-      });
-
-      if (nextVideo && autoPlayEnabled) {
-        console.log("Setting up autoplay for next video");
-        setAutoPlayCountdown(10);
-        
-        countdownIntervalRef.current = setInterval(() => {
-          setAutoPlayCountdown(prev => {
-            if (prev <= 1) {
-              clearInterval(countdownIntervalRef.current);
-              return null;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-
-        autoPlayTimeoutRef.current = setTimeout(() => {
-          clearAutoPlayTimers();
-          setCurrentVideo(nextVideo);
-          
-          setTimeout(() => {
-            if (videoRef.current) {
-              videoRef.current.play().catch(console.error);
-            }
-          }, 500);
-        }, 10000);
-      } else if (isLastVideo) {
-        console.log("Last video completed, marking course as complete");
-        if (onVideoComplete) {
-          await onVideoComplete(videoIndex, true);
-        }
-      }
-    } catch (error) {
-      console.error("Error in video end handling:", error);
-      toast.error("Error updating progress. Please try again.");
+      // Clear any existing timers
       clearAutoPlayTimers();
+      
+      // Start countdown
+      countdownIntervalRef.current = setInterval(() => {
+        setAutoPlayCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownIntervalRef.current);
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Set timeout for actual video change
+      autoPlayTimeoutRef.current = setTimeout(() => {
+        clearAutoPlayTimers();
+        selectVideo(nextVideo);
+        
+        // Try to play after a short delay to ensure video is loaded
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.play().catch(console.error);
+          }
+        }, 500);
+      }, 10000);
+    } else if (isLastVideo) {
+      console.log("Last video completed");
+    }
+  };
+
+  const handleProgress = ({ played, playedSeconds }) => {
+    if (!course?.videos || !currentVideo) return;
+    const videoIndex = course.videos.indexOf(currentVideo);
+
+    // Only check completion if video hasn't been marked complete
+    if (!completedVideos.includes(videoIndex)) {
+      const completionThreshold = 0.95; // 95% completion threshold
+      if (played >= completionThreshold) {
+        console.log("Video reached completion threshold:", {
+          played,
+          threshold: completionThreshold,
+          videoIndex: videoIndex
+        });
+        handleVideoComplete(videoIndex, true);
+      }
+    }
+
+    // Update watch time regardless of completion
+    if (onProgressUpdate && playedSeconds > 0) {
+      onProgressUpdate(videoIndex, playedSeconds);
+    }
+  };
+
+  const handleVideoComplete = async (videoIndex, isComplete) => {
+    console.log("Video completed in CoursePlayer:", { videoIndex, isComplete });
+    
+    if (!completedVideos.includes(videoIndex)) {
+      try {
+        console.log("Saving video completion for index:", videoIndex);
+        
+        // Create new array with current video added
+        const newCompletedVideos = [...completedVideos, videoIndex];
+        
+        // Calculate if this completes the course
+        const isAllCompleted = course?.videos && 
+          newCompletedVideos.length === course.videos.length;
+        
+        console.log("Completion status:", {
+          newCompletedVideos,
+          totalVideos: course?.videos?.length || 0,
+          isAllCompleted
+        });
+
+        // Show completion popup
+        toast.success(
+          <div className="flex flex-col items-center">
+            <CheckCircle className="h-8 w-8 text-green-500 mb-2" />
+            <div className="text-lg font-semibold mb-1">Video Completed! 🎉</div>
+            <div className="text-sm text-gray-200">
+              Your progress is being saved...
+            </div>
+          </div>,
+          {
+            autoClose: 3000,
+            position: "top-center",
+            hideProgressBar: false,
+            closeOnClick: false,
+            pauseOnHover: true,
+            draggable: false,
+            progress: undefined,
+          }
+        );
+
+        // Update local state first
+        setCompletedVideos(newCompletedVideos);
+        
+        // Add a delay before proceeding
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Notify parent component
+        if (onVideoComplete) {
+          await onVideoComplete(videoIndex, isComplete);
+          
+          if (isAllCompleted) {
+            toast.success(
+              <div className="flex flex-col items-center">
+                <Award className="h-10 w-10 text-yellow-500 mb-2" />
+                <div className="text-lg font-semibold mb-1">Congratulations! 🎉</div>
+                <div className="text-sm text-gray-200">
+                  You've completed the entire course!
+                </div>
+              </div>,
+              {
+                autoClose: 5000,
+                position: "top-center",
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: false,
+                progress: undefined,
+              }
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Error in handleVideoComplete:", error);
+        toast.error("Failed to save video progress");
+      }
     }
   };
 
@@ -347,9 +553,18 @@ const CoursePlayer = ({ course, enrollment, initialVideo, onBack, onVideoComplet
       videoRef.current.load();
     }
     
-    // Only auto-play if enabled and not completed
-    if (autoPlayEnabled && !isCompleted) {
+    // Auto-play the video unless it's already completed
+    if (!isCompleted) {
       setIsPlaying(true);
+      // Try to play after a short delay to ensure video is loaded
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.play().catch(error => {
+            console.error("Error auto-playing video:", error);
+            setIsPlaying(false);
+          });
+        }
+      }, 500);
     } else {
       setIsPlaying(false);
     }
@@ -512,6 +727,18 @@ const CoursePlayer = ({ course, enrollment, initialVideo, onBack, onVideoComplet
       fontFamily: "Inter, system-ui, sans-serif",
       color: "white",
     }}>
+      <ToastContainer
+        position="top-center"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick={false}
+        rtl={false}
+        pauseOnFocusLoss
+        draggable={false}
+        pauseOnHover
+        theme="dark"
+      />
       <div className="max-w-7xl mx-auto p-6 space-y-8">
         {/* Header with Progress */}
         <div className="flex flex-col space-y-4">

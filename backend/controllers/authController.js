@@ -179,6 +179,7 @@ exports.googleLogin = async (req, res) => {
       // Generate JWT token
       const jwtToken = generateToken(user._id);
 
+      // Return normalized user data
       res.status(200).json({
         success: true,
         token: jwtToken,
@@ -186,7 +187,8 @@ exports.googleLogin = async (req, res) => {
           _id: user._id,
           name: user.name,
           email: user.email,
-          role: user.role
+          role: user.role,
+          subscriptionExpiry: user.subscriptionExpiry
         }
       });
     } catch (dbError) {
@@ -291,7 +293,19 @@ exports.login = async (req, res) => {
     });
 
     const token = generateToken(user._id);
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+    
+    // Return normalized user data
+    res.json({ 
+      success: true,
+      token, 
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        subscriptionExpiry: user.subscriptionExpiry
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

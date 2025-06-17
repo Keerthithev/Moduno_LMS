@@ -24,6 +24,18 @@ const DashboardLayout = ({ children }) => {
     toast.success("Signed out successfully");
   };
 
+  const getUserInitial = () => {
+    return user?.name ? user.name[0].toUpperCase() : "U";
+  };
+
+  const getUserName = () => {
+    return user?.name || "User";
+  };
+
+  const getUserEmail = () => {
+    return user?.email || "";
+  };
+
   return (
     <div className="flex">
       {/* Sidebar */}
@@ -94,11 +106,11 @@ const DashboardLayout = ({ children }) => {
                 style={{
                   background: "linear-gradient(135deg, #3B82F6 0%, #10B981 100%)",
                 }}>
-                {user?.name?.[0]?.toUpperCase() || "U"}
+                {getUserInitial()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">{user?.name || "User"}</p>
-                <p className="text-xs text-[#93C5FD] truncate">{user?.email}</p>
+                <p className="text-sm font-semibold text-white truncate">{getUserName()}</p>
+                <p className="text-xs text-[#93C5FD] truncate">{getUserEmail()}</p>
               </div>
             </div>
           </div>

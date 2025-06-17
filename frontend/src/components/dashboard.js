@@ -71,63 +71,35 @@ const StatsCard = ({ title, value, change, icon: Icon, color, description }) => 
 
 // Enhanced Course Card Component
 const CourseCard = ({ course, isAdmin = false, onClick, progress = 0, isFavorite = false, onToggleFavorite }) => {
-  // Calculate total videos properly
-  const totalVideos = course.sections?.reduce((total, section) => 
-    total + (section.videos?.length || 0), 0) || course.videos?.length || 0;
+  const totalVideos = course.videos?.length || course.sections?.reduce((acc, section) => acc + (section.videos?.length || 0), 0) || 0;
 
   return (
-    <div
-      className="group overflow-hidden rounded-2xl transition-all duration-300"
+    <div className="group overflow-hidden rounded-2xl transition-all duration-300 hover:scale-105"
       style={{
         background: "rgba(255, 255, 255, 0.08)",
         border: "1px solid rgba(255, 255, 255, 0.15)",
         backdropFilter: "blur(20px)",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-10px)";
-        e.currentTarget.style.boxShadow = "0 20px 40px rgba(59, 130, 246, 0.3)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "none";
-      }}
-    >
-      <div className="relative h-48 overflow-hidden">
+      }}>
+      <div className="relative h-48">
         <div className="absolute inset-0 bg-gradient-to-br from-[#3B82F6] to-[#10B981]" />
         <div className="absolute inset-0 bg-black/20" />
-        <div className="absolute top-4 right-4 flex items-center space-x-2">
-          {!isAdmin && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleFavorite(course._id);
-              }}
-              className={`p-2 rounded-full transition-all duration-300 ${
-                isFavorite 
-                  ? 'bg-red-500 text-white' 
-                  : 'bg-white/10 text-white hover:bg-white/20'
-              }`}
-            >
-              <Heart className={`h-5 w-5 ${isFavorite ? 'fill-current' : ''}`} />
-            </button>
-          )}
-          {progress === 100 ? (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#10B981] text-white border-0">
-              <CheckCircle className="h-3 w-3 mr-1" />
-              Completed
-            </span>
-          ) : progress > 0 ? (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/90 text-[#3B82F6]">
-              {progress}% Complete
-            </span>
-          ) : null}
-        </div>
         <div className="absolute bottom-4 left-4 text-white">
           <div className="flex items-center space-x-2">
             <GraduationCap className="h-5 w-5" />
             <span className="text-sm font-medium">Course</span>
           </div>
         </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite(course._id);
+          }}
+          className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-300"
+        >
+          <Heart
+            className={`h-5 w-5 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-white'}`}
+          />
+        </button>
       </div>
 
       <div className="p-6 space-y-4">
@@ -135,7 +107,7 @@ const CourseCard = ({ course, isAdmin = false, onClick, progress = 0, isFavorite
           <h3 className="font-bold text-lg leading-tight line-clamp-2 group-hover:text-[#3B82F6] transition-colors text-white">
             {course.title}
           </h3>
-          <p className="text-sm text-[#93C5FD]">by {course.instructor || "Expert Instructor"}</p>
+          <p className="text-sm text-[#93C5FD]">by {course.instructor?.name || "Expert Instructor"}</p>
         </div>
 
         {!isAdmin && progress > 0 && (
@@ -389,7 +361,14 @@ const StudentDashboard = ({
     // Load favorites from localStorage on component mount
     const savedFavorites = localStorage.getItem(`favorites_${authUser._id}`);
     if (savedFavorites) {
-      setLocalFavorites(JSON.parse(savedFavorites));
+      try {
+        const parsed = JSON.parse(savedFavorites);
+        if (Array.isArray(parsed)) {
+          setLocalFavorites(parsed);
+        }
+      } catch (error) {
+        console.error('Error parsing favorites:', error);
+      }
     }
   }, [authUser._id]);
 
@@ -406,7 +385,15 @@ const StudentDashboard = ({
       toast.success(
         prev.includes(courseId)
           ? "Removed from favorites"
-          : "Added to favorites"
+          : "Added to favorites",
+        {
+          position: "bottom-right",
+          autoClose: 2000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        }
       );
       
       return newFavorites;
@@ -532,7 +519,7 @@ const StudentDashboard = ({
 };
 
 const Dashboard = () => {
-  const { user: authUser } = useContext(AuthContext);
+  const { user: authUser, logout } = useContext(AuthContext);
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -575,9 +562,17 @@ const Dashboard = () => {
       fetchAdminStats();
     }
 
+    // Load favorites from localStorage
     const savedFavorites = localStorage.getItem(`favorites_${authUser._id}`);
     if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites));
+      try {
+        const parsed = JSON.parse(savedFavorites);
+        if (Array.isArray(parsed)) {
+          setFavorites(parsed);
+        }
+      } catch (error) {
+        console.error('Error parsing favorites:', error);
+      }
     }
 
     Promise.all([fetchCourses(), fetchEnrollments()])
@@ -828,10 +823,29 @@ const Dashboard = () => {
   };
 
   const handleSignOut = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate("/login");
-    toast.success("Signed out successfully");
+    try {
+      // Clear any component state
+      setSelectedCourse(null);
+      setCurrentVideo(null);
+      setFavorites([]);
+      setEnrollments([]);
+      setCourses([]);
+      setStats({
+        totalEnrolled: 0,
+        inProgress: 0,
+        timeSpent: '0h'
+      });
+
+      // Use the AuthContext logout which will clear localStorage
+      logout();
+      
+      // Navigate to login
+      navigate("/login");
+      toast.success("Signed out successfully");
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      toast.error("Error signing out. Please try again.");
+    }
   };
 
   const updateProgress = async (courseId, videoIndex, isCourseComplete = false) => {

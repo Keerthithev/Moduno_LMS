@@ -121,7 +121,7 @@ const AdminCourseList = () => {
       console.log('Using token:', token);
 
       // Get enrollments for admin
-      const enrollmentsRes = await axios.get(`http://localhost:1111/api/v1/courses/enrollments`, {
+      const enrollmentsRes = await axios.get(`http://localhost:1111/api/v1/enrollments`, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -222,20 +222,25 @@ const AdminCourseList = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this course?")) return
+    if (!window.confirm("Are you sure you want to delete this course?")) return;
 
     try {
-      const token = localStorage.getItem("token")
+      const token = localStorage.getItem("token");
       await axios.delete(`http://localhost:1111/api/v1/courses/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      setCourses(courses.filter((c) => c._id !== id))
-      alert("Course deleted successfully!")
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Only update UI after successful deletion
+      setCourses(prev => prev.filter(c => c._id !== id));
+      toast.success("Course deleted successfully!");
+      
+      // Refresh enrollments since a course was deleted
+      await fetchAllEnrollments();
     } catch (error) {
-      alert("Failed to delete course")
-      console.error("Delete course error:", error)
+      console.error("Delete course error:", error);
+      toast.error(error.response?.data?.message || "Failed to delete course");
     }
-  }
+  };
 
   const startEditing = (course) => {
     setEditingCourseId(course._id)

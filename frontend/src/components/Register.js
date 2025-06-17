@@ -4,6 +4,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, AlertCircle, Loader2, Box, Zap, Sparkles, Check, GraduationCap, MapPin, Clock, Award, Monitor, Play ,Target, BookOpen} from 'lucide-react';
 import axios from 'axios';
 import { GoogleLogin } from '@react-oauth/google';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const Register = () => {
   const login = (token, user) => {
@@ -97,11 +99,40 @@ const Register = () => {
     setLoading(true);
     
     try {
+      // Clear any existing localStorage data
+      localStorage.clear();
+      
       const res = await axios.post('http://localhost:1111/api/v1/register', formData);
-      login(res.data.token, res.data.user);
-      navigate('/login');
+      
+      toast.success('Registration successful! Please login to continue.', {
+        position: "top-center",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark"
+      });
+
+      // Short delay before redirecting to login
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
+
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      toast.error(err.response?.data?.message || 'Registration failed. Please try again.', {
+        position: "top-center",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark"
+      });
+    } finally {
       setLoading(false);
     }
   };
@@ -131,6 +162,18 @@ const Register = () => {
       position: "relative",
       overflow: "hidden"
     }}>
+      <ToastContainer
+        position="top-center"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={true}
+        closeOnClick={true}
+        rtl={false}
+        pauseOnFocusLoss={true}
+        draggable={true}
+        pauseOnHover={true}
+        theme="dark"
+      />
       {/* Animated Background Elements */}
       <div style={{
         position: "absolute",

@@ -371,38 +371,70 @@ const StudentCourseList = () => {
             const course = coursesResponse.find(c => 
               c._id.toString() === (enrollment.course?._id || enrollment.courseId).toString()
             );
+            
+            // Calculate completion status
+            const completedVideos = enrollment.progress?.completedVideos || [];
+            const totalVideos = course?.videos?.length || 0;
+            const isCompleted = enrollment.progress?.isCompleted || 
+                              (totalVideos > 0 && completedVideos.length === totalVideos);
+            
             return {
               ...enrollment,
-              course: course || enrollment.course
+              course: course || enrollment.course,
+              progress: {
+                ...enrollment.progress,
+                completedVideos: completedVideos,
+                isCompleted: isCompleted,
+                currentVideoIndex: enrollment.progress?.currentVideoIndex || 0
+              }
             };
           });
 
+          console.log("Updated enrollments with completion status:", updatedEnrollments);
           setEnrollments(updatedEnrollments);
-          console.log("Updated enrollments with course data:", updatedEnrollments);
-
-          // Calculate and update stats
-          const newStats = calculateStats(updatedEnrollments, coursesResponse);
-          console.log("Calculated new stats:", newStats);
-          setStats(newStats);
+          
+          // Update stats with fresh data
+          updateStats(updatedEnrollments, coursesResponse);
 
           // Persist to localStorage
           localStorage.setItem(`enrollments_${authUser._id}`, JSON.stringify(updatedEnrollments));
         } else {
-          // Try to load from localStorage if no enrollments from API
+          // Try to load from localStorage
           const persistedEnrollments = localStorage.getItem(`enrollments_${authUser._id}`);
           if (persistedEnrollments) {
             try {
               const parsed = JSON.parse(persistedEnrollments);
-              setEnrollments(parsed);
+              const validatedEnrollments = parsed.map(enrollment => {
+                const course = coursesResponse.find(c => 
+                  c._id.toString() === (enrollment.course?._id || enrollment.courseId).toString()
+                );
+                
+                // Recalculate completion status
+                const completedVideos = enrollment.progress?.completedVideos || [];
+                const totalVideos = course?.videos?.length || 0;
+                const isCompleted = enrollment.progress?.isCompleted || 
+                                  (totalVideos > 0 && completedVideos.length === totalVideos);
+                
+                return {
+                  ...enrollment,
+                  progress: {
+                    ...enrollment.progress,
+                    isCompleted: isCompleted
+                  }
+                };
+              });
               
-              // Calculate stats from persisted enrollments
-              const newStats = calculateStats(parsed, coursesResponse);
-              setStats(newStats);
-              
-              console.log("Loaded persisted enrollments:", parsed);
+              setEnrollments(validatedEnrollments);
+              updateStats(validatedEnrollments, coursesResponse);
+              console.log("Loaded and validated persisted enrollments:", validatedEnrollments);
             } catch (error) {
               console.error("Error loading persisted enrollments:", error);
+              setEnrollments([]);
+              updateStats([], coursesResponse);
             }
+          } else {
+            setEnrollments([]);
+            updateStats([], coursesResponse);
           }
         }
 
@@ -410,23 +442,8 @@ const StudentCourseList = () => {
       } catch (error) {
         console.error("Error loading initial data:", error);
         toast.error("Failed to load your courses. Please try again.");
-
-        // Try to load from localStorage as fallback
-        const persistedEnrollments = localStorage.getItem(`enrollments_${authUser._id}`);
-        if (persistedEnrollments) {
-      try {
-            const parsed = JSON.parse(persistedEnrollments);
-            setEnrollments(parsed);
-            
-            // Calculate stats even from persisted data
-            const newStats = calculateStats(parsed, courses);
-            setStats(newStats);
-            
-            console.log("Loaded persisted enrollments as fallback:", parsed);
-      } catch (error) {
-            console.error("Error loading persisted enrollments:", error);
-      }
-    }
+        setEnrollments([]);
+        updateStats([], []);
       } finally {
         setLoading(false);
       }
@@ -610,23 +627,88 @@ const StudentCourseList = () => {
     }
   };
 
-  // Update the calculateStats function to remove timeSpent
+  // Update the calculateStats function to be more robust
   const calculateStats = (enrollmentsData, coursesData) => {
-    console.log("Calculating stats with:", {
-      enrollments: enrollmentsData.length,
-      courses: coursesData.length
-    });
+    if (!Array.isArray(enrollmentsData) || !Array.isArray(coursesData)) {
+      console.warn("Invalid data for stats calculation:", { enrollmentsData, coursesData });
+      return {
+        totalCourses: 0,
+        completedCourses: 0,
+        inProgressCourses: 0
+      };
+    }
 
-    const totalEnrolled = enrollmentsData.length;
-    const completed = enrollmentsData.filter(e => e.progress?.isCompleted).length;
-    const inProgress = totalEnrolled - completed;
-    
-    return {
-      totalCourses: totalEnrolled,
-      completedCourses: completed,
-      inProgressCourses: inProgress
-    };
+    try {
+      // Filter out invalid enrollments
+      const validEnrollments = enrollmentsData.filter(e => e && e.progress);
+      
+      // Calculate completed courses
+      const completed = validEnrollments.filter(e => {
+        const courseId = e.course?._id || e.courseId;
+        const course = coursesData.find(c => c._id.toString() === courseId?.toString());
+        
+        // A course is complete if:
+        // 1. The progress.isCompleted flag is true OR
+        // 2. All videos are completed
+        const completedVideos = e.progress?.completedVideos || [];
+        const totalVideos = course?.videos?.length || 0;
+        return e.progress?.isCompleted || (totalVideos > 0 && completedVideos.length === totalVideos);
+      }).length;
+
+      // Calculate total and in progress
+      const totalEnrolled = validEnrollments.length;
+      const inProgress = totalEnrolled - completed;
+
+      console.log("Stats calculation:", {
+        totalEnrolled,
+        completed,
+        inProgress,
+        validEnrollments: validEnrollments.length
+      });
+
+      return {
+        totalCourses: totalEnrolled,
+        completedCourses: completed,
+        inProgressCourses: inProgress
+      };
+    } catch (error) {
+      console.error("Error calculating stats:", error);
+      return {
+        totalCourses: 0,
+        completedCourses: 0,
+        inProgressCourses: 0
+      };
+    }
   };
+
+  // Add a new function to update stats
+  const updateStats = (enrollmentsData, coursesData) => {
+    const newStats = calculateStats(enrollmentsData, coursesData);
+    console.log("Updating stats:", newStats);
+    setStats(newStats);
+    setCompletedCoursesCount(newStats.completedCourses);
+    
+    // Persist stats to localStorage
+    if (authUser?._id) {
+      localStorage.setItem(`stats_${authUser._id}`, JSON.stringify(newStats));
+    }
+  };
+
+  // Add effect to initialize stats from localStorage
+  useEffect(() => {
+    if (authUser?._id) {
+      const savedStats = localStorage.getItem(`stats_${authUser._id}`);
+      if (savedStats) {
+        try {
+          const parsedStats = JSON.parse(savedStats);
+          setStats(parsedStats);
+          setCompletedCoursesCount(parsedStats.completedCourses);
+        } catch (error) {
+          console.error("Error loading saved stats:", error);
+        }
+      }
+    }
+  }, [authUser?._id]);
 
   const handleEnroll = async (courseId) => {
     if (!authUser || !localStorage.getItem('token')) {
@@ -637,54 +719,178 @@ const StudentCourseList = () => {
 
     setEnrolling(courseId);
     try {
-      const enrollmentData = {
-        courseId: courseId
-      };
-
-      console.log("Sending enrollment data:", JSON.stringify(enrollmentData, null, 2));
+      const enrollmentData = { courseId };
+      console.log("Sending enrollment data:", enrollmentData);
 
       const response = await axiosInstance.post("/enrollments/create", enrollmentData);
-
       console.log("Enrollment response:", response.data);
 
       if (response.data?.data) {
-      const newEnrollment = response.data.data;
-        console.log("Enrollment data received:", newEnrollment);
-
+        const newEnrollment = response.data.data;
+        
         setEnrollments(prev => {
           const exists = prev.some(e => 
             e._id === newEnrollment._id || 
             (e.course?._id === newEnrollment.course?._id && e.user === newEnrollment.user)
-          );
-          
+      );
+
           if (exists) return prev;
           
           const updated = [...prev, newEnrollment];
-          console.log("Updated enrollments:", updated);
+          console.log("Updated enrollments after new enrollment:", updated);
 
-          // Recalculate stats with new enrollment
-          const newStats = calculateStats(updated, courses);
-          setStats(newStats);
+          // Update stats with new enrollment
+          updateStats(updated, courses);
 
           localStorage.setItem(`enrollments_${authUser._id}`, JSON.stringify(updated));
           return updated;
         });
 
-      setActiveTab("inProgress");
+        setActiveTab("inProgress");
         toast.success(response.data.message || "Successfully enrolled in course!");
         await fetchEnrollments();
       }
     } catch (error) {
       console.error("Enrollment error:", error);
-      if (error.response?.data?.message?.includes('already enrolled') || 
-          error.response?.status === 409) {
-        toast.info("You are already enrolled in this course");
-        setActiveTab("inProgress");
+      handleEnrollmentError(error);
+    } finally {
+        setEnrolling(null);
+    }
+  };
+
+  const toggleFavorite = (courseId) => {
+    setFavorites((prev) => {
+      const isFavorited = prev.includes(courseId);
+      toast.success(isFavorited ? "Removed from favorites" : "Added to favorites");
+      return isFavorited ? prev.filter((id) => id !== courseId) : [...prev, courseId];
+    });
+  };
+
+  const updateEnrollmentProgress = async (enrollmentId, update) => {
+    console.log("Attempting to update enrollment:", { enrollmentId, update });
+    
+    try {
+      // Use the correct endpoint with base URL
+      const response = await axiosInstance.put(`/enrollments/update/${enrollmentId}`, {
+        progress: update.progress
+      });
+
+      console.log("Update enrollment response:", response.data);
+
+      if (!response.data?.success && !response.data?.data) {
+        throw new Error("Failed to update enrollment progress");
+      }
+
+      return response;
+    } catch (error) {
+      console.error("Error updating enrollment:", error);
+      console.error("Error details:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      throw error;
+    }
+  };
+
+  // Update the handleVideoComplete function
+  const handleVideoComplete = async (videoIndex, isComplete) => {
+    if (!selectedCourse || !currentVideo) return;
+    
+    const enrollment = getEnrollment(selectedCourse._id);
+    if (!enrollment) return;
+
+    try {
+      console.log("Handling video completion:", {
+        videoIndex,
+        isComplete,
+        courseId: selectedCourse._id,
+        enrollmentId: enrollment._id
+      });
+
+      // Get current completed videos
+      const currentCompletedVideos = [...(enrollment.progress?.completedVideos || [])];
+      if (!currentCompletedVideos.includes(videoIndex)) {
+        currentCompletedVideos.push(videoIndex);
+      }
+
+      // Check if this completes the course
+      const totalVideos = selectedCourse.videos?.length || 0;
+      const shouldMarkComplete = currentCompletedVideos.length === totalVideos;
+
+      // Prepare update data
+      const update = {
+        progress: {
+          ...enrollment.progress,
+          currentVideoIndex: videoIndex,
+          completedVideos: currentCompletedVideos,
+          isCompleted: shouldMarkComplete,
+          lastUpdated: new Date().toISOString()
+        }
+      };
+
+      // Update backend
+      try {
+        await axiosInstance.put(
+          `/enrollments/${enrollment._id}/progress`,
+          update
+        );
+        console.log("Progress updated in backend");
+      } catch (error) {
+        console.error("Backend update failed:", error);
+        // Continue with local update even if backend fails
+      }
+
+      // Update local state
+      setEnrollments(prev => {
+        const updated = prev.map(e => 
+          e._id === enrollment._id 
+            ? { ...e, progress: { ...e.progress, ...update.progress } } 
+            : e
+        );
+
+        // Persist to localStorage
+        localStorage.setItem(`enrollments_${authUser._id}`, JSON.stringify(updated));
+
+        // Update stats with new enrollment data
+        updateStats(updated, courses);
+
+        return updated;
+      });
+
+      // Handle course completion
+      if (shouldMarkComplete) {
+        console.log("Course completed!");
+        toast.success("Congratulations! Course completed! 🎉");
+
+        // Reset course player state
+        setSelectedCourse(null);
+        setCurrentVideo(null);
+        
+        // Switch to completed tab
+        setActiveTab("completed");
+
+        // Refresh enrollments to ensure everything is up to date
         await fetchEnrollments();
+      }
+
+      return update.progress;
+    } catch (error) {
+      console.error("Error in handleVideoComplete:", error);
+      toast.error("Failed to save progress. Please try again.");
+      return null;
+    }
+  };
+
+  // Add error handling functions
+  const handleEnrollmentError = (error) => {
+    if (error.response?.data?.message?.includes('already enrolled') || error.response?.status === 409) {
+      toast.info("You are already enrolled in this course");
+      setActiveTab("inProgress");
+      fetchEnrollments();
         return;
       }
 
-      // Handle other errors
       if (error.response) {
         switch (error.response.status) {
           case 404:
@@ -705,157 +911,41 @@ const StudentCourseList = () => {
       } else {
         toast.error("Failed to enroll in course. Please try again.");
       }
-    } finally {
-      setEnrolling(null);
+  };
+
+  const handleVideoCompleteError = (error, enrollmentId, videoIndex) => {
+    const enrollment = getEnrollment(selectedCourse._id);
+    if (!enrollment) return;
+
+    const currentCompletedVideos = [...(enrollment.progress?.completedVideos || [])];
+    if (!currentCompletedVideos.includes(videoIndex)) {
+      currentCompletedVideos.push(videoIndex);
     }
-  };
 
-  const toggleFavorite = (courseId) => {
-    setFavorites((prev) => {
-      const isFavorited = prev.includes(courseId);
-      toast.success(isFavorited ? "Removed from favorites" : "Added to favorites");
-      return isFavorited ? prev.filter((id) => id !== courseId) : [...prev, courseId];
-    });
-  };
-
-  const updateEnrollmentProgress = async (enrollmentId, update) => {
-    console.log("Attempting to update enrollment:", { enrollmentId, update });
-    
-    try {
-      // Try the first endpoint format
-      try {
-        const response = await axiosInstance.put(`/enrollments/${enrollmentId}`, update);
-        if (response.data.success || response.data.data) {
-          return response;
-        }
-      } catch (error) {
-        if (error.response?.status !== 404) {
-          throw error;
-        }
-      }
-
-      // If first attempt fails with 404, try the alternative endpoint
-      const response = await axiosInstance.put(`/api/enrollments/${enrollmentId}`, update);
-      return response;
-    } catch (error) {
-      console.error("Error updating enrollment:", error);
-      throw error;
-    }
-  };
-
-  // Update the onVideoComplete handler
-  const handleVideoComplete = async (enrollmentId, videoIndex, isComplete) => {
-    try {
-      const enrollment = getEnrollment(selectedCourse._id);
-      if (!enrollment) return null;
-
-      // Get current completed videos and add new one if not already included
-      const completedVideos = [...(enrollment.progress?.completedVideos || [])];
-      if (!completedVideos.includes(videoIndex)) {
-        completedVideos.push(videoIndex);
-      }
-
-      // Check if this completes the course
-      const isAllCompleted = completedVideos.length === selectedCourse.videos.length;
-      const shouldMarkComplete = isComplete || isAllCompleted;
-
-      console.log("Completion status check:", {
-        completedVideos,
-        totalVideos: selectedCourse.videos.length,
-        isAllCompleted,
-        shouldMarkComplete
-      });
-
-      const update = {
+    setEnrollments(prev => {
+      const updated = prev.map(e => {
+        if (e._id === enrollmentId) {
+          const updatedEnrollment = {
+            ...e,
         progress: {
-          ...enrollment.progress,
+              ...e.progress,
           currentVideoIndex: videoIndex,
-          completedVideos,
-          isCompleted: shouldMarkComplete,
-          lastUpdated: new Date().toISOString()
-        }
-      };
-
-      console.log("Sending enrollment update:", { enrollmentId, update });
-
-      // Try to update using the helper function
-      const response = await updateEnrollmentProgress(enrollmentId, update);
-
-      if (response.data.success || response.data.data) {
-        // Update local state
-        setEnrollments(prev => {
-          const updated = prev.map(e => {
-            if (e._id === enrollmentId) {
-              const updatedEnrollment = {
-                ...e,
-                progress: {
-                  ...e.progress,
-                  ...update.progress
-                }
-              };
-              console.log("Updated enrollment in state:", updatedEnrollment);
-              return updatedEnrollment;
+              completedVideos: currentCompletedVideos,
+              isCompleted: currentCompletedVideos.length === selectedCourse.videos.length,
+              lastUpdated: new Date().toISOString()
             }
-            return e;
-          });
-
-          // Persist to localStorage
-          localStorage.setItem(`enrollments_${authUser._id}`, JSON.stringify(updated));
-          
-          // Recalculate stats
-          const completed = updated.filter(e => e.progress?.isCompleted).length;
-          setCompletedCoursesCount(completed);
-          
-          return updated;
-        });
-
-        // If course is completed, show success message and update UI
-        if (shouldMarkComplete) {
-          console.log("Course completed, updating UI");
-          toast.success("Course completed! 🎉");
-          setSelectedCourse(null);
-          setCurrentVideo(null);
-          setActiveTab("completed");
-          await fetchEnrollments(); // Refresh enrollment data
+          };
+          return updatedEnrollment;
         }
-
-        return update.progress;
-      }
-    } catch (error) {
-      console.error("Error in handleVideoComplete:", error);
-      
-      // Get the enrollment again to ensure we have the latest data
-      const enrollment = getEnrollment(selectedCourse._id);
-      if (!enrollment) return null;
-
-      // Get current completed videos
-      const currentCompletedVideos = [...(enrollment.progress?.completedVideos || [])];
-      if (!currentCompletedVideos.includes(videoIndex)) {
-        currentCompletedVideos.push(videoIndex);
-      }
-
-      // Update local state even if API fails
-      setEnrollments(prev => {
-        const updated = prev.map(e => {
-          if (e._id === enrollmentId) {
-            return {
-              ...e,
-              progress: {
-                ...e.progress,
-                currentVideoIndex: videoIndex,
-                completedVideos: currentCompletedVideos,
-                isCompleted: isComplete || (currentCompletedVideos.length === selectedCourse.videos.length),
-                lastUpdated: new Date().toISOString()
-              }
-            };
-          }
-          return e;
-        });
-        localStorage.setItem(`enrollments_${authUser._id}`, JSON.stringify(updated));
-        return updated;
+        return e;
       });
-    }
-    return null;
+
+      // Update stats even on error
+      updateStats(updated, courses);
+
+      localStorage.setItem(`enrollments_${authUser._id}`, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   // Add function to get next video
@@ -1022,6 +1112,7 @@ const StudentCourseList = () => {
             {course.title}
           </h3>
           <p className="text-[#93C5FD] line-clamp-2">{course.description}</p>
+          <p className="text-sm text-[#93C5FD]">by {course.instructor?.name || "Expert Instructor"}</p>
 
           {enrollment && (
             <div className="space-y-2">
@@ -1109,7 +1200,7 @@ const StudentCourseList = () => {
             if (!enrollment) return;
 
             try {
-              await handleVideoComplete(enrollment._id, videoIndex, isComplete);
+              await handleVideoComplete(videoIndex, isComplete);
 
               if (isComplete) {
                 toast.success("Course completed! 🎉");

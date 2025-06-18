@@ -22,19 +22,33 @@ dotenv.config({ path: path.join(__dirname, "config/config.env") });
 app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
-  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:2222');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
   next();
 });
 
-// Enable CORS
+// Enable CORS with more flexible configuration
+const allowedOrigins = [
+  'http://localhost:2222',
+  'http://localhost:3000',
+  'https://moduno-lms.vercel.app',
+  'https://moduno-lms-frontend.vercel.app'
+];
+
 app.use(cors({
-  origin: 'http://localhost:2222',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  optionsSuccessStatus: 200 // Some legacy browsers (IE11, various SmartTVs) choke on 204
 }));
 
 const storage = multer.memoryStorage();

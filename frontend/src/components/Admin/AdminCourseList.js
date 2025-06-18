@@ -121,7 +121,7 @@ const AdminCourseList = () => {
       console.log('Using token:', token);
 
       // Get enrollments for admin
-      const enrollmentsRes = await axios.get(`http://localhost:1111/api/v1/enrollments`, {
+      const enrollmentsRes = await axios.get(`https://moduno-lms.onrender.com/api/v1/enrollments`, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -164,7 +164,7 @@ const AdminCourseList = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:1111/api/v1/courses", {
+      const res = await axios.get("https://moduno-lms.onrender.com/api/v1/courses", {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -226,7 +226,7 @@ const AdminCourseList = () => {
 
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`http://localhost:1111/api/v1/courses/${id}`, {
+      await axios.delete(`https://moduno-lms.onrender.com/api/v1/courses/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -285,7 +285,7 @@ const AdminCourseList = () => {
 
   try {
     const token = localStorage.getItem("token");
-    const res = await axios.post("http://localhost:1111/api/v1/upload/video", formData, {
+    const res = await axios.post("https://moduno-lms.onrender.com/api/v1/upload/video", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
         Authorization: `Bearer ${token}`,
@@ -367,7 +367,7 @@ const AdminCourseList = () => {
     console.log('Sending update payload:', JSON.stringify(updatedCourse, null, 2));
 
     const res = await axios.put(
-      `http://localhost:1111/api/v1/courses/${editingCourseId}`,
+      `https://moduno-lms.onrender.com/api/v1/courses/${editingCourseId}`,
       updatedCourse,
       {
         headers: { 

@@ -10,7 +10,7 @@ const Logout = () => {
     localStorage.removeItem("token");
 
     // Optionally, call backend to clear any server-side session (if needed)
-    axios.post("http://localhost:1111/api/v1/logout", {}, {
+    axios.post("https://moduno-lms.onrender.com/api/v1/logout", {}, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`, // Pass token if required by your backend
       }

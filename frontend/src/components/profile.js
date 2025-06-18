@@ -94,7 +94,7 @@ const SettingsForm = ({ darkMode }) => {
     formDataToSend.append('name', formData.name);
     formDataToSend.append('email', formData.email);
 
-    const res = await axios.put('http://localhost:1111/api/v1/profile', formDataToSend, {
+    const res = await axios.put('https://moduno-lms.onrender.com/api/v1/profile', formDataToSend, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'multipart/form-data'
@@ -126,7 +126,7 @@ const SettingsForm = ({ darkMode }) => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.put('http://localhost:1111/api/v1/profile/password', {
+      const res = await axios.put('https://moduno-lms.onrender.com/api/v1/profile/password', {
         currentPassword: formData.currentPassword,
         newPassword: formData.newPassword
       }, {

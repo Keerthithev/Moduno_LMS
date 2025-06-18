@@ -89,7 +89,7 @@ const ForgotPassword = () => {
     setLoading(true);
     
     try {
-      const res = await axios.post('http://localhost:1111/api/v1/forgot-password', { email });
+      const res = await axios.post('https://moduno-lms.onrender.com/api/v1/forgot-password', { email });
       setMessage(res.data.message);
       setStep(2);
       setResendDisabled(true);
@@ -108,7 +108,7 @@ const ForgotPassword = () => {
     setLoading(true);
     
     try {
-      const res = await axios.post('http://localhost:1111/api/v1/resend-otp', { email });
+      const res = await axios.post('https://moduno-lms.onrender.com/api/v1/resend-otp', { email });
       setMessage(res.data.message);
       setResendDisabled(true);
       toast.success('New OTP sent to your email');
@@ -134,7 +134,7 @@ const ForgotPassword = () => {
     setLoading(true);
     
     try {
-      const res = await axios.post('http://localhost:1111/api/v1/verify-otp', 
+      const res = await axios.post('https://moduno-lms.onrender.com/api/v1/verify-otp', 
         { 
           email: email.toLowerCase().trim(), 
           code: otp.trim()
@@ -183,7 +183,7 @@ const ForgotPassword = () => {
         throw new Error('Session expired. Please start the password reset process again.');
       }
 
-      const res = await axios.post('http://localhost:1111/api/v1/reset-password', 
+      const res = await axios.post('https://moduno-lms.onrender.com/api/v1/reset-password', 
         { 
           resetToken,
           newPassword 

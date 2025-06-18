@@ -179,7 +179,7 @@ const AdminAddCourseForm = ({ onCourseAdded }) => {
     try {
       const token = localStorage.getItem("token")
 
-      const res = await axios.post("http://localhost:1111/api/v1/upload/video", formData, {
+      const res = await axios.post("https://moduno-lms.onrender.com/api/v1/upload/video", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
           Authorization: `Bearer ${token}`,
@@ -278,7 +278,7 @@ const AdminAddCourseForm = ({ onCourseAdded }) => {
       if (!token) throw new Error("No authentication token found")
 
       const response = await axios.post(
-        "http://localhost:1111/api/v1/courses/create",
+        "https://moduno-lms.onrender.com/api/v1/courses/create",
         {
           title: title.trim(),
           description: description.trim(),

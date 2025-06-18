@@ -102,7 +102,7 @@ const Register = () => {
       // Clear any existing localStorage data
       localStorage.clear();
       
-      const res = await axios.post('http://localhost:1111/api/v1/register', formData);
+      const res = await axios.post('https://moduno-lms.onrender.com/api/v1/register', formData);
       
       toast.success('Registration successful! Please login to continue.', {
         position: "top-center",
@@ -140,7 +140,7 @@ const Register = () => {
   const handleGoogleLoginSuccess = async (credentialResponse) => {
     setLoading(true);
     try {
-      const res = await axios.post('http://localhost:1111/api/v1/google-login', {
+      const res = await axios.post('https://moduno-lms.onrender.com/api/v1/google-login', {
         token: credentialResponse.credential,
       });
       login(res.data.token, res.data.user);

@@ -84,7 +84,7 @@ const UsersPage = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      const response = await axios.get("http://localhost:1111/api/v1/admin/", {
+      const response = await axios.get("https://moduno-lms.onrender.com/api/v1/admin/", {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUsers(response.data.data);
@@ -362,7 +362,7 @@ ${getEmailSignature()}`;
           return;
       }
 
-      await axios.post("http://localhost:1111/api/v1/admin/send-email", {
+      await axios.post("https://moduno-lms.onrender.com/api/v1/admin/send-email", {
         email,
         subject,
         message
@@ -383,7 +383,7 @@ ${getEmailSignature()}`;
         const token = localStorage.getItem("token");
         const userToDelete = users.find(u => u._id === userId);
         
-        await axios.delete(`http://localhost:1111/api/v1/admin/${userId}`, {
+        await axios.delete(`https://moduno-lms.onrender.com/api/v1/admin/${userId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -428,7 +428,7 @@ ${getEmailSignature()}`;
       const user = users.find(u => u._id === userId);
 
       const response = await axios.put(
-        `http://localhost:1111/api/v1/admin/${userId}/ban`,
+        `https://moduno-lms.onrender.com/api/v1/admin/${userId}/ban`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -480,7 +480,7 @@ ${getEmailSignature()}`;
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        "http://localhost:1111/api/v1/admin/",
+        "https://moduno-lms.onrender.com/api/v1/admin/",
         newUser,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -513,7 +513,7 @@ ${getEmailSignature()}`;
     try {
       const token = localStorage.getItem("token");
       const response = await axios.put(
-        `http://localhost:1111/api/v1/admin/${currentUser._id}`,
+        `https://moduno-lms.onrender.com/api/v1/admin/${currentUser._id}`,
         currentUser,
         { headers: { Authorization: `Bearer ${token}` } }
       );

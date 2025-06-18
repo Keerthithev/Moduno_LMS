@@ -1,4 +1,12 @@
 {
+  "name": "moduno-lms",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "cd frontend && npm start",
+    "build": "cd frontend && npm install && npm run build",
+    "start": "cd frontend && npm start",
+    "install-deps": "cd frontend && npm install"
+  },
   "dependencies": {
     "gsap": "^3.13.0"
   }

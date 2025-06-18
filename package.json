@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "cd frontend && npm install && npm start",
     "build": "cd frontend && npm install && npm run build",
-    "start": "cd frontend && npm install && npm run build && npm run serve",
+    "start": "cd frontend && npm run serve",
     "install-deps": "cd frontend && npm install"
   },
   "dependencies": {

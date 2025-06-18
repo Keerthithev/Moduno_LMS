@@ -115,7 +115,7 @@ function App() {
           <Route path="/logout" element={<Logout />} />
           
           {/* Default route */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/home" replace />} />
         </Routes>
       </div>
     </Router>

@@ -18,21 +18,25 @@ const profile = require('./routes/profile');
 
 dotenv.config({ path: path.join(__dirname, "config/config.env") });
 
-// CORS and security headers configuration
+// CORS and security headers configuration - More aggressive approach
 app.use((req, res, next) => {
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+  // Set CORS headers for all requests
+  res.header('Access-Control-Allow-Origin', 'https://moduno-lms.vercel.app');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
   next();
 });
 
-// Enable CORS with explicit configuration
-app.use(cors({
-  origin: ['http://localhost:2222', 'https://moduno-lms.vercel.app'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  credentials: true,
-  optionsSuccessStatus: 200
-}));
+// Remove the cors middleware to avoid conflicts
+// app.use(cors({...}));
 
 // Add debugging middleware to log all requests
 app.use((req, res, next) => {

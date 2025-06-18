@@ -24,6 +24,7 @@
     "react-router-dom": "^7.6.1",
     "react-scripts": "5.0.1",
     "react-toastify": "^11.0.5",
+    "serve": "^14.2.1",
     "styled-components": "^6.1.18",
     "web-vitals": "^2.1.4"
   },
@@ -31,7 +32,8 @@
     "start": "PORT=2222 react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "serve": "serve -s build -l 2222"
   },
   "eslintConfig": {
     "extends": [

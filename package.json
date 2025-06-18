@@ -2,9 +2,9 @@
   "name": "moduno-lms",
   "version": "1.0.0",
   "scripts": {
-    "dev": "cd frontend && npm start",
+    "dev": "cd frontend && npm install && npm start",
     "build": "cd frontend && npm install && npm run build",
-    "start": "cd frontend && npm start",
+    "start": "cd frontend && npm install && npm run build && npm run serve",
     "install-deps": "cd frontend && npm install"
   },
   "dependencies": {

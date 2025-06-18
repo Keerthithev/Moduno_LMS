@@ -25,9 +25,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Enable CORS with debugging
+// Enable CORS with explicit configuration
 app.use(cors({
-  origin: true, // Allow all origins temporarily for testing
+  origin: ['http://localhost:2222', 'https://moduno-lms.vercel.app'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true,

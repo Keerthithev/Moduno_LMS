@@ -20,18 +20,32 @@ dotenv.config({ path: path.join(__dirname, "config/config.env") });
 
 // CORS and security headers configuration - More aggressive approach
 app.use((req, res, next) => {
-  // Set CORS headers for all requests
-  res.header('Access-Control-Allow-Origin', 'https://moduno-lms.vercel.app');
+  console.log('=== CORS DEBUG ===');
+  console.log('Request Origin:', req.headers.origin);
+  console.log('Request Method:', req.method);
+  console.log('Request Path:', req.path);
+  
+  // Set CORS headers for all requests - temporarily allow all origins
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
   
+  console.log('CORS Headers Set:', {
+    'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
+    'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
+    'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
+    'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials')
+  });
+  
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS preflight request');
     res.status(200).end();
     return;
   }
   
+  console.log('=== END CORS DEBUG ===');
   next();
 });
 
